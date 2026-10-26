@@ -6,6 +6,11 @@ import { absolute, addFile, fitBox, keepable, kindOf, mentionOf, mentionPaths, s
 import { fitCells, imageNumbers, pngSize } from './layout'
 
 const PANE = 'session-files'
+const GALLERY = 'session-files-gallery'
+// A gallery tile's picture box, in cells (the tile adds a border, a gap and a name row).
+const TILE_COLUMNS = 12
+const TILE_ROWS = 4
+const GALLERY_MAX_TILES = 24
 const MIN_ROWS = 3
 // A viewed text file is read again at most this often while the pane redraws.
 const TEXT_TTL_MS = 1500
@@ -16,6 +21,7 @@ const files = atom({ plugin: 'session-files', key: 'files' } as const, [] as Fil
 const selected = atom({ plugin: 'session-files', key: 'selected' } as const, null as string | null)
 const viewing = atom({ plugin: 'session-files', key: 'viewing' } as const, null as string | null)
 const viewOffset = atom({ plugin: 'session-files', key: 'viewOffset' } as const, 0)
+const gallery = atom({ plugin: 'session-files', key: 'gallery' } as const, null as string | null)
 const expanded = atom({ plugin: 'session-files', key: 'expanded' } as const, false)
 const filter = atom({ plugin: 'session-files', key: 'filter' } as const, 'all' as FileFilter)
 
@@ -192,21 +198,29 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
   )
 }
 
-async function viewer($: EngineInterface, e: PaneInput, row: FileRow, bodyRows: number) {
+/** How the viewer is driven: the split panel's own state, or the gallery's (always big, no toggle). */
+type ViewerControl = { prefix: string; isBig: boolean; toggle?: () => Promise<unknown>; close: () => Promise<unknown> }
+
+async function viewer($: EngineInterface, e: PaneInput, row: FileRow, bodyRows: number, ctl?: ViewerControl) {
   const { Box, Text, Button, Code } = $.ui.resolve(e)
   const room = Math.max(1, bodyRows - 3)
-  const isBig = await read($, expanded)
-  const close = async () => {
-    await update($, viewing, () => null)
-    await update($, expanded, () => false)
+  const control: ViewerControl = ctl ?? {
+    prefix: 'files',
+    isBig: await read($, expanded),
+    toggle: () => update($, expanded, was => !was),
+    close: async () => {
+      await update($, viewing, () => null)
+      await update($, expanded, () => false)
+    },
   }
+  const { prefix: p, isBig } = control
   const back = (
     <Box flexDirection="row" columnGap={1}>
-      <Button key="files-back" plain onPress={close}>← Back</Button>
+      <Button key={`${p}-back`} plain onPress={control.close}>← Back</Button>
       <Text bold wrap="truncate">{row.name}</Text>
-      <Button key="files-use" onPress={() => useFile($, row)}>Use</Button>
-      <Button key="files-expand" onPress={() => update($, expanded, was => !was)}>{isBig ? 'Shrink' : 'Expand'}</Button>
-      <Button key="files-open" onPress={() => openOutside($, row)}>Open</Button>
+      <Button key={`${p}-use`} onPress={() => useFile($, row)}>Use</Button>
+      {control.toggle && <Button key={`${p}-expand`} onPress={control.toggle}>{isBig ? 'Shrink' : 'Expand'}</Button>}
+      <Button key={`${p}-open`} onPress={() => openOutside($, row)}>Open</Button>
     </Box>
   )
   const note = (text: string) => (
@@ -235,7 +249,7 @@ async function viewer($: EngineInterface, e: PaneInput, row: FileRow, bodyRows: 
     return (
       <Box flexDirection="column">
         {back}
-        <Image key={`files-image-${row.path}`} source={{ file: png, format: 'png' }} columns={columns} rows={fit.rows} alt={row.name} />
+        <Image key={`${p}-image-${row.path}`} source={{ file: png, format: 'png' }} columns={columns} rows={fit.rows} alt={row.name} />
         {kind === 'pdf' && <Text dimColor>First page only. Open shows the whole document.</Text>}
       </Box>
     )
@@ -252,17 +266,112 @@ async function viewer($: EngineInterface, e: PaneInput, row: FileRow, bodyRows: 
     <Box flexDirection="column">
       {back}
       <Box flexDirection="row" columnGap={2}>
-        <Button key="files-prev" plain onPress={() => step(-room)}>↑ prev</Button>
-        <Button key="files-next" plain onPress={() => step(room)}>↓ next</Button>
+        <Button key={`${p}-prev`} plain onPress={() => step(-room)}>↑ prev</Button>
+        <Button key={`${p}-next`} plain onPress={() => step(room)}>↓ next</Button>
         <Text dimColor>{offset + 1}–{Math.min(lines.length, offset + room)} of {lines.length}</Text>
       </Box>
       <Code
-        key={`files-code-${row.path}`}
+        key={`${p}-code-${row.path}`}
         source={lines.slice(offset, offset + room).join('\n')}
         path={row.path}
         startLine={offset + 1}
         wrap="truncate-end"
       />
+    </Box>
+  )
+}
+
+/** A converted-or-original PNG and its size, kept so a redraw doesn't convert or read it again. */
+const previews = new Map<string, { png: string; size: { width: number; height: number } | null } | null>()
+
+async function previewOf($: EngineInterface, path: string) {
+  if (previews.has(path)) return previews.get(path) ?? undefined
+  const png = await previewPng($, path)
+  const base64 = png === undefined ? undefined : await $.fs.read(png, { as: 'bytes' }).then(b => b.base64, () => undefined)
+  const hit = png === undefined || base64 === undefined ? null : { png, size: pngSize(base64) }
+  // A file still being written or converted is looked at again on the next draw.
+  if (hit !== null) previews.set(path, hit)
+
+  return hit ?? undefined
+}
+
+/** The gallery: every file as a thumbnail tile in a grid; a tile's name opens the file big. */
+async function galleryView($: EngineInterface, e: PaneInput, bodyRows: number) {
+  const open = await read($, gallery)
+  const list = await read($, files)
+  const row = open === null ? undefined : list.find(one => one.path === open)
+  if (row) {
+    return viewer($, e, row, bodyRows, {
+      prefix: 'gallery',
+      isBig: true,
+      close: () => update($, gallery, () => null),
+    })
+  }
+
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const by = await read($, filter)
+  const shown = visibleFiles(list, by)
+  const tiles = shown.slice(0, GALLERY_MAX_TILES)
+  const perRow = Math.max(1, Math.floor((e.props.bodyColumns + 1) / (TILE_COLUMNS + 3)))
+  const grid: FileRow[][] = []
+  for (let i = 0; i < tiles.length; i += perRow) grid.push(tiles.slice(i, i + perRow))
+  const label = (name: string) => (name.length > TILE_COLUMNS ? `${name.slice(0, TILE_COLUMNS - 1)}…` : name)
+
+  const picture = async (one: FileRow) => {
+    const kind = kindOf(one.path)
+    if ((kind === 'image' || kind === 'pdf') && e.surface === 'terminal') {
+      const { Image } = $.ui.resolve(e)
+      const preview = await previewOf($, one.path)
+      if (preview) {
+        const fit = fitBox(preview.size, TILE_COLUMNS, TILE_ROWS)
+
+        return <Image key={`gallery-image-${one.path}`} source={{ file: preview.png, format: 'png' }} columns={fit.columns} rows={fit.rows} alt={one.name} />
+      }
+    }
+    if (kind === 'text') {
+      const lines = ((await textOf($, one.path)) ?? '').split('\n').filter(line => line.trim() !== '').slice(0, TILE_ROWS)
+
+      return (
+        <Box flexDirection="column" width={TILE_COLUMNS}>
+          {lines.map((line, i) => (
+            <Text key={`gallery-line-${one.path}-${i}`} dimColor wrap="truncate">{line.trim()}</Text>
+          ))}
+        </Box>
+      )
+    }
+
+    return <Text dimColor>{kind === 'pdf' ? 'PDF' : kind === 'image' ? 'image' : 'file'}</Text>
+  }
+
+  return (
+    <Box flexDirection="column">
+      <Box flexDirection="row" columnGap={1}>
+        <Text bold>Gallery</Text>
+        <Text dimColor>{shown.length}</Text>
+        {FILTERS.map(f => (
+          <Button key={`gallery-filter-${f.value}`} plain onPress={() => update($, filter, () => f.value)}>
+            <Text bold={by === f.value} dimColor={by !== f.value}>{f.label}</Text>
+          </Button>
+        ))}
+      </Box>
+      {shown.length === 0 && <Text dimColor>Nothing yet: paste an image, @mention a file, or let Claude read one.</Text>}
+      {await Promise.all(
+        grid.map(async (cells, r) => (
+          <Box key={`gallery-row-${r}`} flexDirection="row" columnGap={1}>
+            {await Promise.all(
+              cells.map(async one => (
+                <Box key={`gallery-tile-${one.path}`} flexDirection="column" alignItems="center" borderStyle="round" borderDimColor width={TILE_COLUMNS + 2}>
+                  <Box height={TILE_ROWS} width={TILE_COLUMNS} alignItems="center" justifyContent="center" overflow="hidden">
+                    {await picture(one)}
+                  </Box>
+                  <Button key={`gallery-open-${one.path}`} plain onPress={() => update($, gallery, () => one.path)}>{label(one.name)}</Button>
+                </Box>
+              )),
+            )}
+          </Box>
+        )),
+      )}
+      {shown.length > tiles.length && <Text dimColor>+{shown.length - tiles.length} more</Text>}
     </Box>
   )
 }
@@ -274,11 +383,13 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await safely(() => $.command.register({ name: 'files', description: "Show the session's files in the side panel" }))
+    await safely(() => $.command.register({ name: 'gallery', description: "Show the session's files as a grid of thumbnails" }))
     void safely(async () => {
       const saved = await $.store.get(await storeKey($))
       if (Array.isArray(saved)) await update($, files, list => (list.length > 0 ? list : (saved as FileRow[]).map(row => ({ ...row, kind: kindOf(row.path) }))))
     })
     if (!isSplit) void $.ui.open({ id: PANE, title: 'Files' })
+    void $.ui.open({ id: GALLERY, title: 'Gallery' })
 
     return next(e)
   })
@@ -287,6 +398,12 @@ export const register: Register = (on, options) => {
     await $.ui.open(isSplit ? { id: host, focus: true } : { id: PANE, title: 'Files', focus: true })
 
     return { text: 'Files shown in the side panel.' }
+  })
+
+  on('command.run', { command: 'gallery' }, async $ => {
+    await $.ui.open({ id: GALLERY, title: 'Gallery', focus: true })
+
+    return { text: 'Gallery opened.' }
   })
 
   // Files Claude reads or changes.
@@ -316,6 +433,9 @@ export const register: Register = (on, options) => {
 
     return next(e)
   })
+
+  // The gallery tab: the same files as a grid of thumbnails.
+  on('ui.render', { component: 'Pane', requestId: GALLERY }, async ($, e) => galleryView($, e, e.props.scroll.bodyRows))
 
   // A pane of its own, for the tab layout (and as the fallback when the host pane is not drawn).
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => filesView($, e, e.props.scroll.bodyRows))

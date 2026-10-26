@@ -14,6 +14,10 @@ A Claude Code mod that keeps a live list of the files in your session, so you ca
 
 Rows other than pasted images are remembered per project folder between sessions. A pasted image's file lives in the session's temp folder, so it is only listed for that session.
 
+## Gallery
+
+A **Gallery** tab (next to Todos) shows every file as a thumbnail tile in a grid: pictures and a PDF's first page as pictures, text files as their first lines. Press a tile's name to open the file big in the tab; **Back** returns to the grid. The `all | mine | Claude's` filter works here too, and `/gallery` focuses the tab. A picture itself can't take a click in a terminal pane (only text buttons can), so the name under each tile is the button.
+
 ## Layout
 
 By default the files sit under the todo pane in the same side panel: the todo pane keeps its drawing in the top half (`next(e)` on its pane) and the files take the bottom half. `todo-pane` is not changed. `/files` focuses the panel.

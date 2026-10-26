@@ -122,3 +122,21 @@ test('View shows the shrunk version; Expand takes the panel and Shrink brings th
   expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('the gallery draws a tile per file, and a tile opens the file big, with Back to the grid', async ($, on) => {
+  engine(on)
+  on('fs.read', () => ({ value: 'one\ntwo' }))
+  await start($)
+  await $.tool.call({ tool: 'Read', file_path: '/work/a.ts' })
+  await $.tool.call({ tool: 'Read', file_path: '/work/shot.png' })
+
+  const ui = await $.ui.mount(pane('session-files-gallery'))
+  expect(await ui.find({ type: 'Text', text: /Gallery/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /one/ })).toBeDefined()
+  await ui.press({ plugin: 'session-files', key: 'gallery-open-/work/a.ts' })
+  expect((await ui.find({ type: 'Code' }))?.text).toContain('two')
+  expect(await ui.find({ type: 'Button', text: /Expand|Shrink/ })).toBeUndefined()
+  await ui.press({ plugin: 'session-files', key: 'gallery-back' })
+  expect(await ui.find({ type: 'Text', text: /Gallery/ })).toBeDefined()
+  await ui.unmount()
+})
