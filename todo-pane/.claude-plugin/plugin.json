@@ -1,0 +1,8 @@
+{
+  "name": "todo-pane",
+  "version": "0.1.0",
+  "description": "A side pane that shows Claude's todo list live, grouped by status, priority and blockers, so intermediate steps are not lost in the conversation",
+  "author": { "name": "Laura Pareja Prieto" },
+  "keywords": ["todo", "tasks", "pane", "progress"],
+  "types": "./types/index.d.ts"
+}

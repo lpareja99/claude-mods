@@ -1,0 +1,13 @@
+{
+  "name": "local-mods",
+  "owner": { "name": "Laura Pareja Prieto" },
+  "description": "Claude Code mods by Laura Pareja Prieto",
+  "plugins": [
+    {
+      "name": "todo-pane",
+      "source": "./todo-pane",
+      "description": "A side pane that shows Claude's todo list live, grouped by status, priority and blockers",
+      "author": { "name": "Laura Pareja Prieto" }
+    }
+  ]
+}
