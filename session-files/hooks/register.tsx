@@ -22,6 +22,7 @@ const selected = atom({ plugin: 'session-files', key: 'selected' } as const, nul
 const viewing = atom({ plugin: 'session-files', key: 'viewing' } as const, null as string | null)
 const viewOffset = atom({ plugin: 'session-files', key: 'viewOffset' } as const, 0)
 const mode = atom({ plugin: 'session-files', key: 'mode' } as const, 'grid' as 'grid' | 'list')
+const listPage = atom({ plugin: 'session-files', key: 'listPage' } as const, 0)
 const gridPage = atom({ plugin: 'session-files', key: 'gridPage' } as const, 0)
 const expanded = atom({ plugin: 'session-files', key: 'expanded' } as const, false)
 const filter = atom({ plugin: 'session-files', key: 'filter' } as const, 'all' as FileFilter)
@@ -163,6 +164,7 @@ function header($: EngineInterface, e: PaneInput, count: number, by: FileFilter,
           plain
           onPress={async () => {
             await update($, gridPage, () => 0)
+            await update($, listPage, () => 0)
             await update($, filter, () => f.value)
           }}
         >
@@ -179,7 +181,12 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
   const pick = await read($, selected)
   const shown = visibleFiles(list, by)
   const chosen = shown.find(row => row.path === pick)
-  const room = Math.max(1, bodyRows - 3 - (chosen ? 3 : 0))
+  // Everything fits: no pager. Otherwise a page leaves a row each for the header and the pager and
+  // three for the selected file's card, whether one is selected or not, so a page never changes size.
+  const fitsAll = shown.length <= Math.max(1, bodyRows - 2 - (chosen ? 3 : 0))
+  const perPage = fitsAll ? Math.max(1, shown.length) : Math.max(1, bodyRows - 5)
+  const pages = Math.max(1, Math.ceil(shown.length / perPage))
+  const page = clamp(await read($, listPage), 0, pages - 1)
   const icon = (row: FileRow) => {
     const kind = kindOf(row.path)
 
@@ -194,13 +201,19 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
           {list.length === 0 ? 'Nothing yet: paste an image, @mention a file, or let Claude read one.' : 'No files in this filter.'}
         </Text>
       )}
-      {shown.slice(0, room).map(row => (
+      {shown.slice(page * perPage, (page + 1) * perPage).map(row => (
         <Button key={`files-row-${row.path}`} plain onPress={() => update($, selected, cur => (cur === row.path ? null : row.path))}>
           <Text bold={row.path === pick}>{row.path === pick ? '❯' : ' '} {icon(row)} {row.name}</Text>
           <Text dimColor> {sourcesLabel(row)}</Text>
         </Button>
       ))}
-      {shown.length > room && <Text dimColor>+{shown.length - room} more</Text>}
+      {pages > 1 && (
+        <Box flexDirection="row" columnGap={2}>
+          <Button key="list-prev" plain onPress={() => update($, listPage, () => Math.max(0, page - 1))}>‹ prev</Button>
+          <Text dimColor>{page + 1}/{pages}</Text>
+          <Button key="list-next" plain onPress={() => update($, listPage, () => Math.min(pages - 1, page + 1))}>next ›</Button>
+        </Box>
+      )}
       {chosen && (
         <Box flexDirection="column">
           <Text dimColor wrap="truncate-start">{chosen.path}</Text>

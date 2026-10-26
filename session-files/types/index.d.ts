@@ -28,6 +28,8 @@ declare module 'claude-code' {
       mode: 'grid' | 'list'
       /** The grid's current page, from 0. */
       gridPage: number
+      /** The list's current page, from 0. */
+      listPage: number
       /** The viewer takes the whole panel, the host pane's part included. */
       expanded: boolean
       filter: FileFilter

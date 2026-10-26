@@ -156,3 +156,21 @@ test('the bottom half is a grid of tiles under every host tab, and a tile opens 
   expect(await ui.find({ type: 'Button', text: /a\.ts/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('the list pages when there are more files than rows, and a filter goes back to the first page', async ($, on) => {
+  engine(on)
+  await start($)
+  for (let i = 1; i <= 30; i++) await $.tool.call({ tool: 'Read', file_path: `/work/f${String(i).padStart(2, '0')}.ts` })
+
+  const ui = await $.ui.mount(pane('session-files'))
+  await ui.press({ plugin: 'session-files', key: 'files-mode-list' })
+  // Newest first, 15 rows a page at 20 body rows.
+  expect(await ui.find({ type: 'Button', text: /f30\.ts/ })).toBeDefined()
+  expect(await ui.find({ type: 'Button', text: /f10\.ts/ })).toBeUndefined()
+  await ui.press({ plugin: 'session-files', key: 'list-next' })
+  expect(await ui.find({ type: 'Button', text: /f10\.ts/ })).toBeDefined()
+  expect(await ui.find({ type: 'Button', text: /f30\.ts/ })).toBeUndefined()
+  await ui.press({ plugin: 'session-files', key: 'files-filter-claude' })
+  expect(await ui.find({ type: 'Button', text: /f30\.ts/ })).toBeDefined()
+  await ui.unmount()
+})
