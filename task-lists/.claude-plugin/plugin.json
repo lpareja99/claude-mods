@@ -1,0 +1,8 @@
+{
+  "name": "task-lists",
+  "version": "0.1.0",
+  "description": "A pane that lists every saved Claude task list, for this repo or all of them, so old lists never get lost after /clear",
+  "author": { "name": "Laura Pareja Prieto" },
+  "keywords": ["todo", "tasks", "pane", "lists"],
+  "types": "./types/index.d.ts"
+}

@@ -8,6 +8,12 @@
       "source": "./todo-pane",
       "description": "A side pane that shows Claude's todo list live, grouped by status, priority and blockers",
       "author": { "name": "Laura Pareja Prieto" }
+    },
+    {
+      "name": "task-lists",
+      "source": "./task-lists",
+      "description": "A pane that lists every saved task list, for this repo or all, and lets you choose which one the session uses",
+      "author": { "name": "Laura Pareja Prieto" }
     }
   ]
 }

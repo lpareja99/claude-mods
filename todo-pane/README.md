@@ -76,10 +76,17 @@ For priority, mandatory, subtasks and deferred, the mod adds a short section to 
 
 You can also ask Claude directly to set them on existing tasks.
 
+## Following a list switch
+
+`/todos-sync` re-reads the session's active task list and replaces what the pane shows. The [task-lists](../task-lists) mod runs it after you pick another list; you can also type it.
+
+When a list is pinned with `CLAUDE_CODE_TASK_LIST_ID`, the mod reads that list's folder directly, so descriptions, priority, subtasks and blockers come along. Otherwise it asks `TaskList`, which leaves the metadata out.
+
 ## Limits
 
 - The pane is read-only: clicking opens a card, it does not change tasks.
-- It sees task changes made after it loaded. At session start it reads the existing task list, which has no metadata, so older tasks show without priority.
+- It sees task changes made after it loaded. At session start and on `/todos-sync` it reads the existing list; without a pinned list that read has no metadata, so older tasks show without priority.
+- A reload or `/todos-sync` resets each task's timeline to a single entry: the task files do not store transitions.
 - `TodoWrite` lists have no ids, blockers or metadata, so those rows are plain.
 - Claude following the metadata guidance is likely but not guaranteed.
 - Built and tested against Claude Code 2.1.304.

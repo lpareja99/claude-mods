@@ -158,6 +158,70 @@ const fresh = (id: string, text: string, status: TodoStatus, at: number): TodoIt
   history: [{ status, at }],
 })
 
+type RawTask = {
+  id?: unknown
+  subject?: unknown
+  status?: unknown
+  blockedBy?: unknown
+  description?: unknown
+  activeForm?: unknown
+  metadata?: unknown
+}
+
+/**
+ * The tasks of a list pinned with CLAUDE_CODE_TASK_LIST_ID, read from its folder so
+ * descriptions and metadata come along (TaskList leaves them out). Undefined when
+ * no list is pinned; a pinned list with no folder yet is an empty one.
+ */
+const readPinned = async ($: EngineInterface, at: number): Promise<TodoItem[] | undefined> => {
+  const id = await $.env.get('CLAUDE_CODE_TASK_LIST_ID')
+  if (!id) return undefined
+  const dir = await $.env.get('CLAUDE_CONFIG_DIR')
+  const home = await $.env.get('HOME')
+  const folder = `${dir ? dir.replace(/\/$/, '') : `${home ?? ''}/.claude`}/tasks/${id}`
+  const files = (await $.fs.list(folder).catch(() => [])).filter(
+    f => f.kind === 'file' && f.name.endsWith('.json'),
+  )
+  const raw = await Promise.all(
+    files.map(async f => {
+      try {
+        return JSON.parse(await $.fs.read(`${folder}/${f.name}`)) as RawTask
+      } catch {
+        return undefined
+      }
+    }),
+  )
+
+  return raw
+    .filter((t): t is RawTask => t !== undefined && t.id !== undefined && typeof t.subject === 'string')
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map(t => {
+      const status: ToolStatus =
+        t.status === 'completed' || t.status === 'in_progress' ? t.status : 'pending'
+
+      return {
+        ...fresh(String(t.id), String(t.subject), fromTool(status), at),
+        blockedBy: Array.isArray(t.blockedBy) ? t.blockedBy.map(String) : [],
+        ...(typeof t.description === 'string' ? { description: t.description } : {}),
+        ...(typeof t.activeForm === 'string' ? { activeForm: t.activeForm } : {}),
+        ...readMeta(t.metadata),
+      }
+    })
+}
+
+/** The session's active task list: the pinned one, else whatever TaskList answers. */
+const readActive = async ($: EngineInterface, at: number): Promise<TodoItem[]> => {
+  const pinned = await readPinned($, at)
+  if (pinned) return pinned
+  const listed = await $.tool.call({ tool: 'TaskList' })
+  const tasks = (listed.result as ListResult | undefined)?.tasks ?? []
+
+  return tasks.map(t => ({
+    ...fresh(t.id, t.subject, fromTool(t.status), at),
+    blockedBy: t.blockedBy,
+  }))
+}
+
 /** What the model is told so the pane can show more than status: the metadata the pane reads. */
 const GUIDE = [
   'todo-pane shows your tasks in a side pane. When you create tasks with TaskCreate, set `metadata` so it can sort and group them:',
@@ -187,22 +251,19 @@ export const register: Register = on => {
         description: "Show Claude's todo list in a pane",
       }),
     )
+    // Other mods (task-lists) run this after pointing the task tools at another list.
+    await safely($, () =>
+      $.command.register({
+        name: 'todos-sync',
+        description: 'Re-read the active task list into the Todos pane',
+      }),
+    )
     void $.ui.open({ id: PANE, title: 'Todos' })
 
     // Pick up tasks that exist already, e.g. after a mod reload; off the start path.
     void safely($, async () => {
-      const listed = await $.tool.call({ tool: 'TaskList' })
-      const tasks = (listed.result as ListResult | undefined)?.tasks
-      if (!tasks) return
-      const at = Date.now()
-      await update($, items, list =>
-        list.length > 0
-          ? list
-          : tasks.map(t => ({
-              ...fresh(t.id, t.subject, fromTool(t.status), at),
-              blockedBy: t.blockedBy,
-            })),
-      )
+      const tasks = await readActive($, Date.now())
+      await update($, items, list => (list.length > 0 ? list : tasks))
     })
 
     return next(e)
@@ -212,6 +273,18 @@ export const register: Register = on => {
     await $.ui.open({ id: PANE, title: 'Todos', focus: true })
 
     return { text: 'Todos pane opened.' }
+  })
+
+  // The active list changed under the pane: show the new one, not the old one's events.
+  on('command.run', { command: 'todos-sync' }, async $ => {
+    await safely($, async () => {
+      const tasks = await readActive($, Date.now())
+      await update($, items, () => tasks)
+      await update($, selected, () => null)
+    })
+    const shown = await read($, items)
+
+    return { text: `Todos pane now shows the active task list (${shown.length} tasks).` }
   })
 
   // TodoWrite replaces the whole list; keep history for items that persist.
