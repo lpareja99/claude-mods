@@ -1,6 +1,6 @@
 {
   "name": "session-files",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Live list and thumbnail gallery of the files in your session: pasted images, @mentions, and files Claude read or edited. Reuse one in the next prompt, or open it in the side panel",
   "author": { "name": "Laura Pareja Prieto" },
   "license": "MIT",
@@ -19,13 +19,6 @@
       "title": "Host panes",
       "description": "Comma-separated ids of the panes (tabs) the files go under in split layout; the files stay while you switch between them",
       "default": "todo-pane,task-lists"
-    },
-    "tileClick": {
-      "type": "string",
-      "title": "Grid tile click (experimental)",
-      "description": "name: a click on the file name under a tile opens it; whole: invisible buttons over the picture too (may hide the picture in some terminals)",
-      "default": "name",
-      "options": ["name", "whole"]
     },
     "topShare": {
       "type": "number",

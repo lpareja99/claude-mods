@@ -20,7 +20,7 @@ The field under the header (`⌕ search by name or path`) narrows the grid and t
 
 ## Grid and list
 
-The bottom half starts as a **grid** of thumbnail tiles: pictures and a PDF's first page as pictures, text files as their first lines, a page at a time with `‹ prev  2/7  next ›` pinned to the last line of the box (the list pages the same way). The header reads `Files 4 │ ▦ ≡ │ all mine Claude's`: the count, then the view (▦ grid, ≡ list), then the filter, and whichever is in use is drawn inverted. `/gallery` shows the grid. A picture itself can't take a click in a terminal pane (only text buttons can), so the name under each tile is the button: pressing it opens the file at thumbnail size, with **Expand**, **Use**, **Open** and **Back** as above.
+The bottom half starts as a **grid** of thumbnail tiles: pictures and a PDF's first page as pictures, text files as their first lines, a page at a time with `‹ prev  2/7  next ›` pinned to the last line of the box (the list pages the same way). The header reads `Files 4 │ ▦ ≡ │ all mine Claude's`: the count, then the view (▦ grid, ≡ list), then the filter, and whichever is in use is drawn inverted. `/gallery` shows the grid. A picture itself can't take a click in a terminal pane (only text buttons can), so the name bar under each tile, padded to the tile's full width, is the button: pressing it opens the file at thumbnail size, with **Expand**, **Use**, **Open** and **Back** as above.
 
 ## Layout
 
@@ -30,7 +30,6 @@ Set in the mod's options:
 
 - `layout`: `split` (default) or `tab` (a pane of its own).
 - `hostPanes`: comma-separated ids of the panes (tabs) the files go under, `todo-pane,task-lists` by default.
-- `tileClick` (experimental): `name` (default) or `whole`. In `name` mode a click on the name bar under a tile (padded to the tile's width) opens the file. In `whole` mode invisible one-row buttons are also laid over the picture, so a click anywhere on the tile opens it; they may blank the picture in some terminals, so switch back to `name` if the thumbnails disappear.
 - `topShare`: the share of the panel's height the host pane keeps, 50 by default.
 
 For the split to work this mod's hook must sit outside the host pane's in the hook chain; if the todo pane then shows alone, switch `layout` to `tab`.
