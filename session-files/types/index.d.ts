@@ -26,6 +26,8 @@ declare module 'claude-code' {
       viewOffset: number
       /** The bottom half shows thumbnail tiles or the plain list. */
       mode: 'grid' | 'list'
+      /** The search box's text. */
+      query: string
       /** The grid's current page, from 0. */
       gridPage: number
       /** The list's current page, from 0. */

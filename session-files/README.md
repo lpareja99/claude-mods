@@ -10,13 +10,17 @@ A Claude Code mod that keeps a live list of the files in your session, so you ca
 | @ | a file you `@mention` in a prompt (only if it exists) |
 | read / edited | a file Claude reads, edits or writes |
 
-**What you can do with a row** (click it, or Tab to it and Enter): **Use** puts `@path` in your prompt at the cursor, **View** shows the file in the panel (images as pictures, text with highlighting and prev/next paging), **Forget** drops it from the list. The `all | mine | Claude's` filter splits what you attached from what Claude touched.
+**What you can do with a row** (click it, or Tab to it and Enter, which opens a card with the file's name, size and age, and its path): press **u** or click **Use** to put `@path` in your prompt at the cursor, **v** or **View** shows the file in the panel (images as pictures, text with highlighting and prev/next paging), **f** or **Forget** drops it from the list. The hotkeys work while the panel has the keyboard. The `all | mine | Claude's` filter splits what you attached from what Claude touched.
 
 Rows other than pasted images are remembered per project folder between sessions. They load by themselves when a new session starts with an empty list. A pasted image's file lives in the session's temp folder, so it is only listed for that session.
 
+## Search
+
+The field under the header (`⌕ search by name or path`) narrows the grid and the list as you type: every word must be in the file's name or path, in any order, ignoring case. Focus it with a click or Tab, type, and press Esc to give the keys back; `✕` clears it. It combines with the `all | mine | Claude's` filter, and the count in the header is the number of matches.
+
 ## Grid and list
 
-The bottom half starts as a **grid** of thumbnail tiles: pictures and a PDF's first page as pictures, text files as their first lines, a page at a time with `‹ prev` / `next ›` (the list pages the same way). The header reads `Files 4 │ ▦ ≡ │ all mine Claude's`: the count, then the view (▦ grid, ≡ list), then the filter, and whichever is in use is drawn inverted. `/gallery` shows the grid. A picture itself can't take a click in a terminal pane (only text buttons can), so the name under each tile is the button: pressing it opens the file at thumbnail size, with **Expand**, **Use**, **Open** and **Back** as above.
+The bottom half starts as a **grid** of thumbnail tiles: pictures and a PDF's first page as pictures, text files as their first lines, a page at a time with `‹ prev  2/7  next ›` pinned to the last line of the box (the list pages the same way). The header reads `Files 4 │ ▦ ≡ │ all mine Claude's`: the count, then the view (▦ grid, ≡ list), then the filter, and whichever is in use is drawn inverted. `/gallery` shows the grid. A picture itself can't take a click in a terminal pane (only text buttons can), so the name under each tile is the button: pressing it opens the file at thumbnail size, with **Expand**, **Use**, **Open** and **Back** as above.
 
 ## Layout
 

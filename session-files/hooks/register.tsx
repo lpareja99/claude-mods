@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderInput } from 'claude-code'
 
 import type { FileFilter, FileRow } from '../types'
-import { absolute, addFile, fitBox, keepable, kindOf, mentionOf, mentionPaths, sourcesLabel, touched, visibleFiles } from './files'
+import { absolute, addFile, ago, fitBox, formatSize, keepable, kindOf, matching, mentionOf, mentionPaths, sourcesLabel, touched } from './files'
 import { fitCells, imageNumbers, pngSize } from './layout'
 
 const PANE = 'session-files'
@@ -22,6 +22,7 @@ const selected = atom({ plugin: 'session-files', key: 'selected' } as const, nul
 const viewing = atom({ plugin: 'session-files', key: 'viewing' } as const, null as string | null)
 const viewOffset = atom({ plugin: 'session-files', key: 'viewOffset' } as const, 0)
 const mode = atom({ plugin: 'session-files', key: 'mode' } as const, 'grid' as 'grid' | 'list')
+const query = atom({ plugin: 'session-files', key: 'query' } as const, '')
 const listPage = atom({ plugin: 'session-files', key: 'listPage' } as const, 0)
 const gridPage = atom({ plugin: 'session-files', key: 'gridPage' } as const, 0)
 const expanded = atom({ plugin: 'session-files', key: 'expanded' } as const, false)
@@ -175,16 +176,59 @@ function header($: EngineInterface, e: PaneInput, count: number, by: FileFilter,
   )
 }
 
+/** The search field and a clear button; typing narrows both views and goes back to the first page. */
+async function searchRow($: EngineInterface, e: PaneInput) {
+  // The element table of one surface (mobile) has no Input.
+  if (e.surface === 'mobile') return undefined
+  const { Box, Text, Button, Input } = $.ui.resolve(e)
+  const q = await read($, query)
+  const set = async (value: string) => {
+    await update($, gridPage, () => 0)
+    await update($, listPage, () => 0)
+    await update($, query, () => value)
+  }
+
+  return (
+    <Box flexDirection="row" columnGap={1}>
+      <Input key="files-search" label="⌕" placeholder="search by name or path" value={q} onInput={set} onSubmit={set} />
+      {q !== '' && <Button key="files-search-clear" plain onPress={() => set('')}><Text dimColor>✕</Text></Button>}
+    </Box>
+  )
+}
+
+/** `‹ prev  2/7  next ›`, drawn on the last line of the bottom half. */
+function pager(
+  $: EngineInterface,
+  e: PaneInput,
+  name: string,
+  page: number,
+  pages: number,
+  go: (to: number) => Promise<unknown>,
+) {
+  if (pages <= 1) return undefined
+  const { Box, Text, Button } = $.ui.resolve(e)
+
+  return (
+    <Box flexDirection="row" columnGap={2}>
+      <Button key={`${name}-prev`} plain onPress={() => go(Math.max(0, page - 1))}>‹ prev</Button>
+      <Text dimColor>{page + 1}/{pages}</Text>
+      <Button key={`${name}-next`} plain onPress={() => go(Math.min(pages - 1, page + 1))}>next ›</Button>
+    </Box>
+  )
+}
+
 async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows: number) {
   const { Box, Text, Button } = $.ui.resolve(e)
   const by = await read($, filter)
   const pick = await read($, selected)
-  const shown = visibleFiles(list, by)
+  const q = await read($, query)
+  const shown = matching(list, by, q)
   const chosen = shown.find(row => row.path === pick)
-  // Everything fits: no pager. Otherwise a page leaves a row each for the header and the pager and
-  // three for the selected file's card, whether one is selected or not, so a page never changes size.
-  const fitsAll = shown.length <= Math.max(1, bodyRows - 2 - (chosen ? 3 : 0))
-  const perPage = fitsAll ? Math.max(1, shown.length) : Math.max(1, bodyRows - 5)
+  const stat = chosen && (await $.fs.stat(chosen.path).catch(() => undefined))
+  // The header and the search take two rows, the pager one, the card four (a blank line and three). When everything fits there is
+  // no pager; otherwise a page leaves room for the card whether one is selected or not, so it never resizes.
+  const fitsAll = shown.length <= Math.max(1, bodyRows - 2 - (chosen ? 4 : 0))
+  const perPage = fitsAll ? Math.max(1, shown.length) : Math.max(1, bodyRows - 7)
   const pages = Math.max(1, Math.ceil(shown.length / perPage))
   const page = clamp(await read($, listPage), 0, pages - 1)
   const icon = (row: FileRow) => {
@@ -194,11 +238,12 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
   }
 
   return (
-    <Box flexDirection="column">
-      {header($, e, list.length, by, 'list')}
+    <Box flexDirection="column" height={bodyRows}>
+      {header($, e, shown.length, by, 'list')}
+      {await searchRow($, e)}
       {shown.length === 0 && (
         <Text dimColor>
-          {list.length === 0 ? 'Nothing yet: paste an image, @mention a file, or let Claude read one.' : 'No files in this filter.'}
+          {list.length === 0 ? 'Nothing yet: paste an image, @mention a file, or let Claude read one.' : 'No file matches.'}
         </Text>
       )}
       {shown.slice(page * perPage, (page + 1) * perPage).map(row => (
@@ -208,12 +253,18 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
         </Button>
       ))}
       {chosen && (
-        <Box flexDirection="column">
+        <Box flexDirection="column" marginTop={1}>
+          <Box flexDirection="row" columnGap={1}>
+            <Text bold wrap="truncate">{chosen.name}</Text>
+            <Text dimColor>{[stat ? formatSize(stat.size) : 'gone', ago(chosen.lastAt, Date.now())].join(' · ')}</Text>
+          </Box>
           <Text dimColor wrap="truncate-start">{chosen.path}</Text>
-          <Box flexDirection="row" columnGap={2}>
-            <Button key="files-use" onPress={() => useFile($, chosen)}>Use</Button>
+          <Box flexDirection="row" columnGap={3}>
+            <Button key="files-use" plain hotkey="u" onPress={() => useFile($, chosen)}><Text bold>Use</Text></Button>
             <Button
               key="files-view"
+              plain
+              hotkey="v"
               onPress={async () => {
                 await update($, viewOffset, () => 0)
                 await update($, expanded, () => false)
@@ -222,20 +273,14 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
             >
               View
             </Button>
-            <Button key="files-forget" onPress={() => forgetFile($, chosen)}>Forget</Button>
+            <Button key="files-forget" plain hotkey="f" onPress={() => forgetFile($, chosen)}><Text dimColor>Forget</Text></Button>
             {chosen.uses > 0 && <Text dimColor>used {chosen.uses}×</Text>}
           </Box>
         </Box>
       )}
-      {/* The pager stays at the bottom: an empty card's worth of rows holds its place while nothing is selected. */}
-      {!chosen && pages > 1 && <Box height={3} />}
-      {pages > 1 && (
-        <Box flexDirection="row" columnGap={2}>
-          <Button key="list-prev" plain onPress={() => update($, listPage, () => Math.max(0, page - 1))}>‹ prev</Button>
-          <Text dimColor>{page + 1}/{pages}</Text>
-          <Button key="list-next" plain onPress={() => update($, listPage, () => Math.min(pages - 1, page + 1))}>next ›</Button>
-        </Box>
-      )}
+      {/* The pager is pinned to the last line of the box. */}
+      <Box flexGrow={1} />
+      {pager($, e, 'list', page, pages, to => update($, listPage, () => to))}
     </Box>
   )
 }
@@ -341,10 +386,11 @@ async function previewOf($: EngineInterface, path: string) {
 async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows: number) {
   const { Box, Text, Button } = $.ui.resolve(e)
   const by = await read($, filter)
-  const shown = visibleFiles(list, by)
+  const q = await read($, query)
+  const shown = matching(list, by, q)
   const perRow = Math.max(1, Math.floor((e.props.bodyColumns + 1) / (TILE_COLUMNS + 3)))
-  // The header takes a row and the pager one; the tiles get the rest, at least one row of them.
-  const rowsPerPage = Math.max(1, Math.floor((bodyRows - 2) / TILE_HEIGHT))
+  // The header and the search take two rows and the pager one; the tiles get the rest, at least one row of them.
+  const rowsPerPage = Math.max(1, Math.floor((bodyRows - 3) / TILE_HEIGHT))
   const perPage = perRow * rowsPerPage
   const pages = Math.max(1, Math.ceil(shown.length / perPage))
   const page = clamp(await read($, gridPage), 0, pages - 1)
@@ -385,9 +431,10 @@ async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows:
   }
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" height={bodyRows}>
       {header($, e, shown.length, by, 'grid')}
-      {shown.length === 0 && <Text dimColor>Nothing yet: paste an image, @mention a file, or let Claude read one.</Text>}
+      {await searchRow($, e)}
+      {shown.length === 0 && <Text dimColor>{list.length === 0 ? 'Nothing yet: paste an image, @mention a file, or let Claude read one.' : 'No file matches.'}</Text>}
       {await Promise.all(
         rows.map(async (cells, r) => (
           <Box key={`grid-row-${r}`} flexDirection="row" columnGap={1}>
@@ -404,13 +451,9 @@ async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows:
           </Box>
         )),
       )}
-      {pages > 1 && (
-        <Box flexDirection="row" columnGap={2}>
-          <Button key="grid-prev" plain onPress={() => update($, gridPage, () => Math.max(0, page - 1))}>‹ prev</Button>
-          <Text dimColor>{page + 1}/{pages}</Text>
-          <Button key="grid-next" plain onPress={() => update($, gridPage, () => Math.min(pages - 1, page + 1))}>next ›</Button>
-        </Box>
-      )}
+      {/* The pager is pinned to the last line of the box. */}
+      <Box flexGrow={1} />
+      {pager($, e, 'grid', page, pages, to => update($, gridPage, () => to))}
     </Box>
   )
 }

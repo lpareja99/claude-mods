@@ -91,3 +91,31 @@ export function fitBox(size: { width: number; height: number } | null, maxColumn
 
   return { columns, rows }
 }
+
+/** The files a filter and a search box leave: every word of the query must be in the name or the path. */
+export function matching(list: FileRow[], by: FileFilter, query: string): FileRow[] {
+  const words = query.toLowerCase().split(/\s+/).filter(word => word !== '')
+
+  return visibleFiles(list, by).filter(row => {
+    const hay = `${row.name} ${row.path}`.toLowerCase()
+
+    return words.every(word => hay.includes(word))
+  })
+}
+
+export function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** "just now", "5m ago", "3h ago", "2d ago". */
+export function ago(at: number, now: number): string {
+  const seconds = Math.max(0, Math.round((now - at) / 1000))
+  if (seconds < 45) return 'just now'
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`
+
+  return `${Math.round(seconds / 86400)}d ago`
+}

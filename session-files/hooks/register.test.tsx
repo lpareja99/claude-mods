@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { absolute, addFile, fitBox, kindOf, mentionOf, mentionPaths, touched } from './files'
+import { absolute, addFile, ago, fitBox, formatSize, kindOf, matching, mentionOf, mentionPaths, touched } from './files'
 
 const pane = (requestId: string) =>
   ({
@@ -72,6 +72,16 @@ test('in split layout the host pane keeps its drawing and the files go under it'
 })
 
 test('files helpers', () => {
+  const rows = ['/w/Login-Screen.png', '/w/notes/todo.md', '/w/src/login.ts'].map(path => addFile([], path, 'read', 1)[0]!)
+  expect(matching(rows, 'all', 'LOGIN').map(r => r.name)).toEqual(['Login-Screen.png', 'login.ts'])
+  expect(matching(rows, 'all', 'login ts').map(r => r.name)).toEqual(['login.ts'])
+  expect(matching(rows, 'mine', '')).toEqual([])
+  expect(formatSize(512)).toBe('512 B')
+  expect(formatSize(2048)).toBe('2.0 KB')
+  expect(formatSize(5 * 1024 * 1024)).toBe('5.0 MB')
+  expect(ago(0, 10_000)).toBe('just now')
+  expect(ago(0, 5 * 60_000)).toBe('5m ago')
+  expect(ago(0, 3 * 3600_000)).toBe('3h ago')
   expect(kindOf('/a/Doc.PDF')).toBe('pdf')
   // 1600x800 into 40x30 cells: width-bound; into 100x5: height-bound.
   expect(fitBox({ width: 1600, height: 800 }, 40, 30)).toEqual({ columns: 40, rows: 10 })
@@ -172,5 +182,21 @@ test('the list pages when there are more files than rows, and a filter goes back
   expect(await ui.find({ type: 'Button', text: /f30\.ts/ })).toBeUndefined()
   await ui.press({ plugin: 'session-files', key: 'files-filter-claude' })
   expect(await ui.find({ type: 'Button', text: /f30\.ts/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('typing in the search box narrows the list, and the clear button brings every file back', async ($, on) => {
+  engine(on)
+  await start($)
+  for (const name of ['alpha.ts', 'beta.ts', 'alphabet.md']) await $.tool.call({ tool: 'Read', file_path: `/work/${name}` })
+
+  const ui = await $.ui.mount(pane('session-files'))
+  await ui.press({ plugin: 'session-files', key: 'files-mode-list' })
+  expect(await ui.find({ type: 'Button', text: /beta\.ts/ })).toBeDefined()
+  await ui.input({ plugin: 'session-files', key: 'files-search', text: 'alpha', kind: 'change' })
+  expect(await ui.find({ type: 'Button', text: /beta\.ts/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Button', text: /alphabet\.md/ })).toBeDefined()
+  await ui.press({ plugin: 'session-files', key: 'files-search-clear' })
+  expect(await ui.find({ type: 'Button', text: /beta\.ts/ })).toBeDefined()
   await ui.unmount()
 })
