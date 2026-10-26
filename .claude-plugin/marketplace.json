@@ -28,6 +28,14 @@
       "author": {
         "name": "Laura Pareja Prieto"
       }
+    },
+    {
+      "name": "session-files",
+      "source": "./session-files",
+      "description": "Live list of the files in your session (pasted images, @mentions, files Claude read or edited): reuse them in the next prompt or view them in the side panel",
+      "author": {
+        "name": "Laura Pareja Prieto"
+      }
     }
   ]
 }

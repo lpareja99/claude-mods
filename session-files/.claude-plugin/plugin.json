@@ -1,0 +1,30 @@
+{
+  "name": "session-files",
+  "version": "0.1.0",
+  "description": "Live list of the files in your session: pasted images, @mentions, and files Claude read or edited. Reuse one in the next prompt, or open it in the side panel",
+  "author": { "name": "Laura Pareja Prieto" },
+  "license": "MIT",
+  "keywords": ["files", "attachments", "pane", "images", "recall"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "layout": {
+      "type": "string",
+      "title": "Layout",
+      "description": "split: files under the todo pane in the same side panel; tab: files in a pane of their own",
+      "default": "split",
+      "options": ["split", "tab"]
+    },
+    "hostPane": {
+      "type": "string",
+      "title": "Host pane",
+      "description": "Id of the pane the files go under in split layout",
+      "default": "todo-pane"
+    },
+    "topShare": {
+      "type": "number",
+      "title": "Top share (%)",
+      "description": "Share of the panel's height the host pane keeps in split layout",
+      "default": 50
+    }
+  }
+}
