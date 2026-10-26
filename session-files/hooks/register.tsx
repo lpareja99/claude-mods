@@ -9,11 +9,14 @@ const PANE = 'session-files'
 const MIN_ROWS = 3
 // A viewed text file is read again at most this often while the pane redraws.
 const TEXT_TTL_MS = 1500
+// The longest side of a converted preview: big enough to stay sharp when the viewer takes the whole panel.
+const PREVIEW_PX = 1600
 
 const files = atom({ plugin: 'session-files', key: 'files' } as const, [] as FileRow[])
 const selected = atom({ plugin: 'session-files', key: 'selected' } as const, null as string | null)
 const viewing = atom({ plugin: 'session-files', key: 'viewing' } as const, null as string | null)
 const viewOffset = atom({ plugin: 'session-files', key: 'viewOffset' } as const, 0)
+const expanded = atom({ plugin: 'session-files', key: 'expanded' } as const, false)
 const filter = atom({ plugin: 'session-files', key: 'filter' } as const, 'all' as FileFilter)
 
 type PaneInput = RenderInput<'Pane'>
@@ -74,17 +77,17 @@ async function pastedFile($: EngineInterface, n: number): Promise<string | undef
   return entry === undefined ? undefined : `${dir}/${entry.name}`
 }
 
-/** What the terminal can draw: a PNG as is, any other image converted once (sips, macOS) beside the pastes. */
+/** What the terminal can draw: a PNG as is; any other image, or a PDF's first page, converted once (sips, macOS) beside the pastes. */
 async function previewPng($: EngineInterface, path: string): Promise<string | undefined> {
   if (/\.png$/i.test(path)) return path
   const dir = await imagesDir($)
   if (dir === undefined) return undefined
   let hash = 0x811c9dc5
   for (let i = 0; i < path.length; i++) hash = Math.imul(hash ^ path.charCodeAt(i), 0x01000193)
-  const out = `${dir.replace(/\/images$/, '')}/session-files-${hash >>> 0}.png`
+  const out = `${dir.replace(/\/images$/, '')}/session-files-${hash >>> 0}-${PREVIEW_PX}.png`
   if (await $.fs.exists(out)) return out
   const { exitCode } = await $.process
-    .run(['sips', '-s', 'format', 'png', '-Z', '800', path, '--out', out])
+    .run(['sips', '-s', 'format', 'png', '-Z', String(PREVIEW_PX), path, '--out', out])
     .catch(() => ({ exitCode: 1 }))
 
   return exitCode === 0 ? out : undefined
@@ -106,6 +109,12 @@ async function useFile($: EngineInterface, row: FileRow) {
   await $.prompt.fill({ text: ` @${mention.includes(' ') ? `"${mention}"` : mention} `, mode: 'insert' })
   await update($, files, list => list.map(one => (one.path === row.path ? { ...one, uses: one.uses + 1 } : one)))
   await save($)
+}
+
+/** The whole file in the system's own viewer (Preview on macOS), for what a terminal panel can't show big. */
+async function openOutside($: EngineInterface, row: FileRow) {
+  const isMac = (await $.process.run(['uname'])).stdout.trim() === 'Darwin'
+  await $.process.run([isMac ? 'open' : 'xdg-open', row.path])
 }
 
 async function forgetFile($: EngineInterface, row: FileRow) {
@@ -130,7 +139,7 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
   const shown = visibleFiles(list, by)
   const chosen = shown.find(row => row.path === pick)
   const room = Math.max(1, bodyRows - 3 - (chosen ? 3 : 0))
-  const icon = (row: FileRow) => (row.kind === 'image' ? '▣' : row.kind === 'text' ? '≡' : '·')
+  const icon = (row: FileRow) => (row.kind === 'image' ? '▣' : row.kind === 'pdf' ? '▤' : row.kind === 'text' ? '≡' : '·')
 
   return (
     <Box flexDirection="column">
@@ -181,11 +190,18 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
 async function viewer($: EngineInterface, e: PaneInput, row: FileRow, bodyRows: number) {
   const { Box, Text, Button, Code } = $.ui.resolve(e)
   const room = Math.max(1, bodyRows - 3)
+  const isBig = await read($, expanded)
+  const close = async () => {
+    await update($, viewing, () => null)
+    await update($, expanded, () => false)
+  }
   const back = (
     <Box flexDirection="row" columnGap={1}>
-      <Button key="files-back" plain onPress={() => update($, viewing, () => null)}>← Back</Button>
+      <Button key="files-back" plain onPress={close}>← Back</Button>
       <Text bold wrap="truncate">{row.name}</Text>
       <Button key="files-use" onPress={() => useFile($, row)}>Use</Button>
+      <Button key="files-expand" onPress={() => update($, expanded, was => !was)}>{isBig ? 'Shrink' : 'Expand'}</Button>
+      <Button key="files-open" onPress={() => openOutside($, row)}>Open</Button>
     </Box>
   )
   const note = (text: string) => (
@@ -195,21 +211,22 @@ async function viewer($: EngineInterface, e: PaneInput, row: FileRow, bodyRows: 
     </Box>
   )
 
-  if (row.kind === 'image') {
+  if (row.kind === 'image' || row.kind === 'pdf') {
     // Only the terminal's element table draws a picture from a file.
     if (e.surface !== 'terminal') return note('Images are shown in the terminal.')
     const { Image } = $.ui.resolve(e)
     const png = await previewPng($, row.path)
-    if (png === undefined) return note('No preview for this image format here.')
+    if (png === undefined) return note(row.kind === 'pdf' ? 'No preview for this PDF here: use Open.' : 'No preview for this image format here.')
     const base64 = await $.fs.read(png, { as: 'bytes' }).then(b => b.base64, () => undefined)
     if (base64 === undefined) return note("Can't read this image (over 4 MiB or gone).")
-    const fit = fitCells(pngSize(base64), room)
+    const fit = fitCells(pngSize(base64), Math.max(3, room - (row.kind === 'pdf' ? 1 : 0)))
     const columns = Math.min(fit.columns, Math.max(4, e.props.bodyColumns - 2))
 
     return (
       <Box flexDirection="column">
         {back}
         <Image key={`files-image-${row.path}`} source={{ file: png, format: 'png' }} columns={columns} rows={fit.rows} alt={row.name} />
+        {row.kind === 'pdf' && <Text dimColor>First page only. Open shows the whole document.</Text>}
       </Box>
     )
   }
@@ -302,6 +319,8 @@ export const register: Register = (on, options) => {
       const topRows = clamp(Math.round(((rows - 1) * share) / 100), MIN_ROWS, rows - 1 - MIN_ROWS)
       const bottomRows = rows - 1 - topRows
       const rule = '─'.repeat(Math.max(4, e.props.bodyColumns))
+      // A viewer opened big takes the whole panel; the host pane's part waits behind it.
+      if ((await read($, viewing)) !== null && (await read($, expanded))) return filesView($, e, e.props.scroll.bodyRows)
       const upper = await next({ ...e, props: { ...e.props, scroll: { ...e.props.scroll, bodyRows: topRows } } })
 
       return (

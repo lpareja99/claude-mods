@@ -1,5 +1,5 @@
 export type FileSource = 'pasted' | 'mention' | 'read' | 'edit'
-export type FileKind = 'image' | 'text' | 'other'
+export type FileKind = 'image' | 'pdf' | 'text' | 'other'
 export type FileFilter = 'all' | 'mine' | 'claude'
 
 export type FileRow = {
@@ -24,6 +24,8 @@ declare module 'claude-code' {
       viewing: string | null
       /** First line (text) shown while viewing. */
       viewOffset: number
+      /** The viewer takes the whole panel, the host pane's part included. */
+      expanded: boolean
       filter: FileFilter
     }
   }

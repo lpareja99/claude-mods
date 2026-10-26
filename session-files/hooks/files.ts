@@ -2,9 +2,10 @@ import type { FileFilter, FileKind, FileRow, FileSource } from '../types'
 
 const MAX_ROWS = 200
 const IMAGE = /\.(png|jpe?g|gif|webp|bmp|heic|tiff?)$/i
-const BINARY = /\.(pdf|zip|gz|tar|dmg|exe|bin|mp[34]|mov|wav|docx?|xlsx?|pptx?)$/i
+const PDF = /\.pdf$/i
+const BINARY = /\.(zip|gz|tar|dmg|exe|bin|mp[34]|mov|wav|docx?|xlsx?|pptx?)$/i
 
-export const kindOf = (path: string): FileKind => (IMAGE.test(path) ? 'image' : BINARY.test(path) ? 'other' : 'text')
+export const kindOf = (path: string): FileKind => (IMAGE.test(path) ? 'image' : PDF.test(path) ? 'pdf' : BINARY.test(path) ? 'other' : 'text')
 
 export const nameOf = (path: string) => path.split(/[\\/]/).pop() || path
 
