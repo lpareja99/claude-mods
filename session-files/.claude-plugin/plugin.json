@@ -1,6 +1,6 @@
 {
   "name": "session-files",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Live list and thumbnail gallery of the files in your session: pasted images, @mentions, and files Claude read or edited. Reuse one in the next prompt, or open it in the side panel",
   "author": { "name": "Laura Pareja Prieto" },
   "license": "MIT",

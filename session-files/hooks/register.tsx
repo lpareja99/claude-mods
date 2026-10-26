@@ -444,7 +444,7 @@ async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows:
               cells.map(async one => (
                 <Box key={`grid-tile-${one.path}`} flexDirection="column" alignItems="center" borderStyle="round" borderDimColor width={TILE_COLUMNS + 2}>
                   <Box height={TILE_ROWS} width={TILE_COLUMNS} alignItems="center" justifyContent="center" overflow="hidden">
-                    {await picture(one)}
+                    {/* Drawn before the picture, so the picture paints over the blank cells instead of the other way round. */}
                     {wholeTileClick && (
                       <Box position="absolute" top={0} left={0} width={TILE_COLUMNS} height={TILE_ROWS} flexDirection="column">
                         {Array.from({ length: TILE_ROWS }, (_, row) => (
@@ -454,6 +454,7 @@ async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows:
                         ))}
                       </Box>
                     )}
+                    {await picture(one)}
                   </Box>
                   {/* The name is padded to the tile's width, so the whole bottom line takes the click. */}
                   <Button key={`grid-open-${one.path}`} plain onPress={() => open(one.path)}>{label(one.name).padEnd(TILE_COLUMNS, ' ')}</Button>
