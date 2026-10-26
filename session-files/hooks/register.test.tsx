@@ -156,21 +156,3 @@ test('the bottom half is a grid of tiles under every host tab, and a tile opens 
   expect(await ui.find({ type: 'Button', text: /a\.ts/ })).toBeDefined()
   await ui.unmount()
 })
-
-test('/files-load never duplicates a file the list already holds', async ($, on) => {
-  engine(on, [
-    { path: '/work/old.ts', name: 'old.ts', kind: 'text', sources: ['read'], firstAt: 1, lastAt: 1, uses: 0 },
-    { path: '/work/a.ts', name: 'a.ts', kind: 'text', sources: ['read'], firstAt: 1, lastAt: 1, uses: 0 },
-  ])
-  await start($)
-  await $.tool.call({ tool: 'Read', file_path: '/work/a.ts' })
-
-  const { text } = await $.command.run({
-    command: 'files-load',
-    args: '',
-    origin: { kind: 'composer' },
-    presentation: { isFullscreen: true, columns: 120 },
-  })
-  // The start already loaded the saved rows, and Read touched one of them again: nothing is new.
-  expect(text).toBe('Added 0 saved files to the list (2 in all).')
-})

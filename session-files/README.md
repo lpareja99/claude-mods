@@ -12,7 +12,7 @@ A Claude Code mod that keeps a live list of the files in your session, so you ca
 
 **What you can do with a row** (click it, or Tab to it and Enter): **Use** puts `@path` in your prompt at the cursor, **View** shows the file in the panel (images as pictures, text with highlighting and prev/next paging), **Forget** drops it from the list. The `all | mine | Claude's` filter splits what you attached from what Claude touched.
 
-Rows other than pasted images are remembered per project folder between sessions. They load by themselves when a new session starts with an empty list; `/files-load` brings the saved ones into a session that is already running. A pasted image's file lives in the session's temp folder, so it is only listed for that session.
+Rows other than pasted images are remembered per project folder between sessions. They load by themselves when a new session starts with an empty list. A pasted image's file lives in the session's temp folder, so it is only listed for that session.
 
 ## Grid and list
 
