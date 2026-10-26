@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderInput } from 'claude-code'
 
 import type { FileFilter, FileRow } from '../types'
-import { absolute, addFile, keepable, kindOf, mentionOf, mentionPaths, sourcesLabel, touched, visibleFiles } from './files'
-import { fitCells, imageNumbers, pngSize } from './layout'
+import { absolute, addFile, fitBox, keepable, kindOf, mentionOf, mentionPaths, sourcesLabel, touched, visibleFiles } from './files'
+import { imageNumbers, pngSize } from './layout'
 
 const PANE = 'session-files'
 const MIN_ROWS = 3
@@ -139,7 +139,11 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
   const shown = visibleFiles(list, by)
   const chosen = shown.find(row => row.path === pick)
   const room = Math.max(1, bodyRows - 3 - (chosen ? 3 : 0))
-  const icon = (row: FileRow) => (row.kind === 'image' ? '▣' : row.kind === 'pdf' ? '▤' : row.kind === 'text' ? '≡' : '·')
+  const icon = (row: FileRow) => {
+    const kind = kindOf(row.path)
+
+    return kind === 'image' ? '▣' : kind === 'pdf' ? '▤' : kind === 'text' ? '≡' : '·'
+  }
 
   return (
     <Box flexDirection="column">
@@ -173,6 +177,7 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
               key="files-view"
               onPress={async () => {
                 await update($, viewOffset, () => 0)
+                await update($, expanded, () => true)
                 await update($, viewing, () => chosen.path)
               }}
             >
@@ -211,27 +216,30 @@ async function viewer($: EngineInterface, e: PaneInput, row: FileRow, bodyRows: 
     </Box>
   )
 
-  if (row.kind === 'image' || row.kind === 'pdf') {
+  // The kind is read from the path, not the stored row: a row saved by an older version may be stale.
+  const kind = kindOf(row.path)
+  if (kind === 'image' || kind === 'pdf') {
     // Only the terminal's element table draws a picture from a file.
     if (e.surface !== 'terminal') return note('Images are shown in the terminal.')
     const { Image } = $.ui.resolve(e)
     const png = await previewPng($, row.path)
-    if (png === undefined) return note(row.kind === 'pdf' ? 'No preview for this PDF here: use Open.' : 'No preview for this image format here.')
+    if (png === undefined) return note(kind === 'pdf' ? 'No preview for this PDF here: use Open.' : 'No preview for this image format here.')
     const base64 = await $.fs.read(png, { as: 'bytes' }).then(b => b.base64, () => undefined)
     if (base64 === undefined) return note("Can't read this image (over 4 MiB or gone).")
-    const fit = fitCells(pngSize(base64), Math.max(3, room - (row.kind === 'pdf' ? 1 : 0)))
-    const columns = Math.min(fit.columns, Math.max(4, e.props.bodyColumns - 2))
+    // Fill the panel: as wide as it is, as tall as is left, whichever the picture's shape allows.
+    const fit = fitBox(pngSize(base64), Math.max(4, e.props.bodyColumns - 1), Math.max(3, room - (kind === 'pdf' ? 1 : 0)))
+    const columns = fit.columns
 
     return (
       <Box flexDirection="column">
         {back}
         <Image key={`files-image-${row.path}`} source={{ file: png, format: 'png' }} columns={columns} rows={fit.rows} alt={row.name} />
-        {row.kind === 'pdf' && <Text dimColor>First page only. Open shows the whole document.</Text>}
+        {kind === 'pdf' && <Text dimColor>First page only. Open shows the whole document.</Text>}
       </Box>
     )
   }
 
-  if (row.kind === 'other') return note('A binary file: open it outside the terminal.')
+  if (kind === 'other') return note('A binary file: open it outside the terminal.')
   const text = await textOf($, row.path)
   if (text === undefined) return note("Can't read this file (over 4 MiB or gone).")
   const lines = text.split('\n')
@@ -266,7 +274,7 @@ export const register: Register = (on, options) => {
     await safely(() => $.command.register({ name: 'files', description: "Show the session's files in the side panel" }))
     void safely(async () => {
       const saved = await $.store.get(await storeKey($))
-      if (Array.isArray(saved)) await update($, files, list => (list.length > 0 ? list : (saved as FileRow[])))
+      if (Array.isArray(saved)) await update($, files, list => (list.length > 0 ? list : (saved as FileRow[]).map(row => ({ ...row, kind: kindOf(row.path) }))))
     })
     if (!isSplit) void $.ui.open({ id: PANE, title: 'Files' })
 

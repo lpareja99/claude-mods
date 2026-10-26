@@ -75,3 +75,19 @@ export function touched(e: { tool: string }): { path: string; source: FileSource
 
   return spec && typeof path === 'string' && path !== '' ? { path, source: spec.source } : undefined
 }
+
+// A terminal cell is about twice as tall as it is wide.
+const CELL_ASPECT = 2
+
+/** The biggest box of cells that keeps a picture's shape inside `maxColumns` x `maxRows`. */
+export function fitBox(size: { width: number; height: number } | null, maxColumns: number, maxRows: number) {
+  const { width, height } = size ?? { width: 16, height: 10 }
+  let columns = Math.max(1, maxColumns)
+  let rows = Math.max(1, Math.round((columns * height) / (CELL_ASPECT * width)))
+  if (rows > maxRows) {
+    rows = Math.max(1, maxRows)
+    columns = Math.max(1, Math.min(maxColumns, Math.round((rows * CELL_ASPECT * width) / height)))
+  }
+
+  return { columns, rows }
+}

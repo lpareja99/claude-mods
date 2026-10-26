@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { absolute, addFile, mentionOf, mentionPaths, touched } from './files'
+import { absolute, addFile, fitBox, kindOf, mentionOf, mentionPaths, touched } from './files'
 
 const pane = (requestId: string) =>
   ({
@@ -70,6 +70,10 @@ test('in split layout the host pane keeps its drawing and the files go under it'
 })
 
 test('files helpers', () => {
+  expect(kindOf('/a/Doc.PDF')).toBe('pdf')
+  // 1600x800 into 40x30 cells: width-bound; into 100x5: height-bound.
+  expect(fitBox({ width: 1600, height: 800 }, 40, 30)).toEqual({ columns: 40, rows: 10 })
+  expect(fitBox({ width: 1600, height: 800 }, 100, 5)).toEqual({ columns: 20, rows: 5 })
   expect(mentionPaths('look at @src/a.ts, and @"my dir/b.png". @someone said hi')).toEqual(['src/a.ts', 'my dir/b.png'])
   expect(absolute('/work/app', '../lib/x.ts')).toBe('/work/lib/x.ts')
   expect(mentionOf('/work', '/work/a/b.ts')).toBe('a/b.ts')
@@ -97,7 +101,7 @@ test('View shows a text file in the panel and Back returns to the list', async (
   await ui.unmount()
 })
 
-test('Expand gives the viewer the whole panel and Shrink brings the host pane back', async ($, on) => {
+test('View opens big; Shrink brings the host pane back and Expand takes the panel again', async ($, on) => {
   engine(on)
   on('fs.read', () => ({ value: 'one\ntwo' }))
   on('ui.render', ($, e) => {
@@ -111,10 +115,10 @@ test('Expand gives the viewer the whole panel and Shrink brings the host pane ba
   const ui = await $.ui.mount(pane('todo-pane'))
   await ui.press({ plugin: 'session-files', key: 'files-row-/work/a.ts' })
   await ui.press({ plugin: 'session-files', key: 'files-view' })
-  expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeDefined()
-  await ui.press({ plugin: 'session-files', key: 'files-expand' })
   expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeUndefined()
   await ui.press({ plugin: 'session-files', key: 'files-expand' })
   expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeDefined()
+  await ui.press({ plugin: 'session-files', key: 'files-expand' })
+  expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeUndefined()
   await ui.unmount()
 })
