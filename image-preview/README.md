@@ -1,4 +1,4 @@
-# image-view-transcript
+# image-preview
 
 A Claude Code mod for pasted images. It does three things:
 
@@ -11,7 +11,7 @@ Real pictures in Ghostty and kitty; colored half blocks in other terminals. Non-
 ## Install
 
 ```
-/plugin install image-view-transcript --marketplace lpareja99/claude-mods
+/plugin install image-preview --marketplace lpareja99/claude-mods
 /reload-plugins
 ```
 

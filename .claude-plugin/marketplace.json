@@ -22,8 +22,8 @@
       }
     },
     {
-      "name": "image-view-transcript",
-      "source": "./image-view-transcript",
+      "name": "image-preview",
+      "source": "./image-preview",
       "description": "Thumbnails of pasted images above the prompt and on the sent message, and no duplicate pastes in one prompt",
       "author": {
         "name": "Laura Pareja Prieto"

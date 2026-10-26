@@ -13,7 +13,7 @@ import type { Thumb } from './png'
 const POLL_MS = 200
 const SENT_TILE_ROWS = 6
 
-const images = atom({ plugin: 'image-view-transcript', key: 'images' } as const, [] as PastedImage[])
+const images = atom({ plugin: 'image-preview', key: 'images' } as const, [] as PastedImage[])
 
 let tmpRoot: string | undefined
 let found: { sessionId: string; dir: string } | undefined
