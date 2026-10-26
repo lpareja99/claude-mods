@@ -23,13 +23,13 @@ type Dollar = Parameters<TestBody>[0]
 type On = Parameters<TestBody>[1]
 
 // The hooks beneath the plugin are registered first, as a module registers its own in register().
-const engine = (on: On) => {
+const engine = (on: On, saved?: unknown) => {
   on('command.register', () => ({ value: { command: 'files' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/work' }))
   on('store.set', () => ({ value: undefined }))
-  on('store.get', () => ({ value: undefined }))
+  on('store.get', () => ({ value: saved }))
   on('tool.call', () => ({ result: {} }))
 }
 const start = ($: Dollar) => $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
@@ -155,4 +155,22 @@ test('the bottom half is a grid of tiles under every host tab, and a tile opens 
   await ui.press({ plugin: 'session-files', key: 'files-back' })
   expect(await ui.find({ type: 'Button', text: /a\.ts/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('/files-load never duplicates a file the list already holds', async ($, on) => {
+  engine(on, [
+    { path: '/work/old.ts', name: 'old.ts', kind: 'text', sources: ['read'], firstAt: 1, lastAt: 1, uses: 0 },
+    { path: '/work/a.ts', name: 'a.ts', kind: 'text', sources: ['read'], firstAt: 1, lastAt: 1, uses: 0 },
+  ])
+  await start($)
+  await $.tool.call({ tool: 'Read', file_path: '/work/a.ts' })
+
+  const { text } = await $.command.run({
+    command: 'files-load',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: true, columns: 120 },
+  })
+  // The start already loaded the saved rows, and Read touched one of them again: nothing is new.
+  expect(text).toBe('Added 0 saved files to the list (2 in all).')
 })

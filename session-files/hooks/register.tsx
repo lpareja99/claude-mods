@@ -410,6 +410,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await safely(() => $.command.register({ name: 'files', description: "Show the session's files in the side panel" }))
+    await safely(() => $.command.register({ name: 'files-load', description: "Add the files saved for this project to the list (they load on their own only in a new session)" }))
     await safely(() => $.command.register({ name: 'gallery', description: "Show the session's files as a grid of thumbnails" }))
     void safely(async () => {
       const saved = await $.store.get(await storeKey($))
@@ -426,6 +427,17 @@ export const register: Register = (on, options) => {
     await $.ui.open(isSplit ? { id: hosts[0] ?? 'todo-pane', focus: true } : { id: PANE, title: 'Files', focus: true })
 
     return { text: 'Files shown in the side panel.' }
+  })
+
+  // Saved rows are read when a session starts with an empty list; this brings in the ones added since.
+  on('command.run', { command: 'files-load' }, async $ => {
+    const saved = await $.store.get(await storeKey($))
+    const rows = Array.isArray(saved) ? (saved as FileRow[]).map(row => ({ ...row, kind: kindOf(row.path) })) : []
+    const before = (await read($, files)).length
+    await update($, files, list => [...list, ...rows.filter(row => !list.some(one => one.path === row.path))])
+    const added = (await read($, files)).length - before
+
+    return { text: `Added ${added} saved file${added === 1 ? '' : 's'} to the list (${before + added} in all).` }
   })
 
   on('command.run', { command: 'gallery' }, async $ => {
