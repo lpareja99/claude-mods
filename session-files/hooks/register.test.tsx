@@ -49,7 +49,7 @@ test('a file Claude reads shows up in the list, and Use puts its @mention in the
   const ui = await $.ui.mount(pane('session-files'))
   // The bottom half starts as a grid of tiles; the mode button switches it to the list.
   expect(await ui.find({ type: 'Button', text: /notes\.md/ })).toBeDefined()
-  await ui.press({ plugin: 'session-files', key: 'files-mode' })
+  await ui.press({ plugin: 'session-files', key: 'files-mode-list' })
   await ui.press({ plugin: 'session-files', key: 'files-row-/work/src/notes.md' })
   await ui.press({ plugin: 'session-files', key: 'files-use' })
   expect(filled).toEqual([' @src/notes.md '])
@@ -95,7 +95,7 @@ test('View shows a text file in the panel and Back returns to the list', async (
   await $.tool.call({ tool: 'Edit', file_path: '/work/a.ts', old_string: 'a', new_string: 'b' })
 
   const ui = await $.ui.mount(pane('session-files'))
-  await ui.press({ plugin: 'session-files', key: 'files-mode' })
+  await ui.press({ plugin: 'session-files', key: 'files-mode-list' })
   await ui.press({ plugin: 'session-files', key: 'files-row-/work/a.ts' })
   await ui.press({ plugin: 'session-files', key: 'files-view' })
   expect((await ui.find({ type: 'Code' }))?.text).toContain('second line')
@@ -116,7 +116,7 @@ test('View shows the shrunk version; Expand takes the panel and Shrink brings th
   await $.tool.call({ tool: 'Read', file_path: '/work/a.ts' })
 
   const ui = await $.ui.mount(pane('todo-pane'))
-  await ui.press({ plugin: 'session-files', key: 'files-mode' })
+  await ui.press({ plugin: 'session-files', key: 'files-mode-list' })
   await ui.press({ plugin: 'session-files', key: 'files-row-/work/a.ts' })
   await ui.press({ plugin: 'session-files', key: 'files-view' })
   expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeDefined()

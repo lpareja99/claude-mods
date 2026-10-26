@@ -16,7 +16,7 @@ Rows other than pasted images are remembered per project folder between sessions
 
 ## Grid and list
 
-The bottom half starts as a **grid** of thumbnail tiles: pictures and a PDF's first page as pictures, text files as their first lines, a page at a time with `‹ prev` / `next ›`. The `list` button next to the title switches to the plain list and `grid` switches back; `/gallery` shows the grid. A picture itself can't take a click in a terminal pane (only text buttons can), so the name under each tile is the button: pressing it opens the file at thumbnail size, with **Expand**, **Use**, **Open** and **Back** as above.
+The bottom half starts as a **grid** of thumbnail tiles: pictures and a PDF's first page as pictures, text files as their first lines, a page at a time with `‹ prev` / `next ›`. The header reads `Files 4 │ ▦ ≡ │ all mine Claude's`: the count, then the view (▦ grid, ≡ list), then the filter, and whichever is in use is drawn inverted. `/gallery` shows the grid. A picture itself can't take a click in a terminal pane (only text buttons can), so the name under each tile is the button: pressing it opens the file at thumbnail size, with **Expand**, **Use**, **Open** and **Back** as above.
 
 ## Layout
 

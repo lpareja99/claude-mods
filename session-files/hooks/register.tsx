@@ -141,6 +141,38 @@ async function filesView($: EngineInterface, e: PaneInput, bodyRows: number) {
   return (await read($, mode)) === 'grid' ? grid($, e, list, bodyRows) : browser($, e, list, bodyRows)
 }
 
+/** Title, view switch (grid or list) and filter, as chips: the one in use is drawn inverted, the others dim. */
+function header($: EngineInterface, e: PaneInput, count: number, by: FileFilter, view: 'grid' | 'list') {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const chip = (label: string, isOn: boolean) => (
+    <Text inverse={isOn} bold={isOn} dimColor={!isOn}> {label} </Text>
+  )
+
+  return (
+    <Box flexDirection="row" columnGap={1}>
+      <Text bold>Files</Text>
+      <Text dimColor>{count}</Text>
+      <Text dimColor>│</Text>
+      {(['grid', 'list'] as const).map(v => (
+        <Button key={`files-mode-${v}`} plain onPress={() => update($, mode, () => v)}>{chip(v === 'grid' ? '▦' : '≡', view === v)}</Button>
+      ))}
+      <Text dimColor>│</Text>
+      {FILTERS.map(f => (
+        <Button
+          key={`files-filter-${f.value}`}
+          plain
+          onPress={async () => {
+            await update($, gridPage, () => 0)
+            await update($, filter, () => f.value)
+          }}
+        >
+          {chip(f.label, by === f.value)}
+        </Button>
+      ))}
+    </Box>
+  )
+}
+
 async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows: number) {
   const { Box, Text, Button } = $.ui.resolve(e)
   const by = await read($, filter)
@@ -156,16 +188,7 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
 
   return (
     <Box flexDirection="column">
-      <Box flexDirection="row" columnGap={1}>
-        <Text bold>Files</Text>
-        <Text dimColor>{list.length}</Text>
-        <Button key="files-mode" plain onPress={() => update($, mode, () => 'grid')}>grid</Button>
-        {FILTERS.map(f => (
-          <Button key={`files-filter-${f.value}`} plain onPress={() => update($, filter, () => f.value)}>
-            <Text bold={by === f.value} dimColor={by !== f.value}>{f.label}</Text>
-          </Button>
-        ))}
-      </Box>
+      {header($, e, list.length, by, 'list')}
       {shown.length === 0 && (
         <Text dimColor>
           {list.length === 0 ? 'Nothing yet: paste an image, @mention a file, or let Claude read one.' : 'No files in this filter.'}
@@ -348,19 +371,7 @@ async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows:
 
   return (
     <Box flexDirection="column">
-      <Box flexDirection="row" columnGap={1}>
-        <Text bold>Files</Text>
-        <Text dimColor>{shown.length}</Text>
-        <Button key="files-mode" plain onPress={() => update($, mode, () => 'list')}>list</Button>
-        {FILTERS.map(f => (
-          <Button key={`files-filter-${f.value}`} plain onPress={async () => {
-            await update($, gridPage, () => 0)
-            await update($, filter, () => f.value)
-          }}>
-            <Text bold={by === f.value} dimColor={by !== f.value}>{f.label}</Text>
-          </Button>
-        ))}
-      </Box>
+      {header($, e, shown.length, by, 'grid')}
       {shown.length === 0 && <Text dimColor>Nothing yet: paste an image, @mention a file, or let Claude read one.</Text>}
       {await Promise.all(
         rows.map(async (cells, r) => (
