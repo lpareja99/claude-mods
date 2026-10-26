@@ -405,6 +405,8 @@ export const register: Register = (on, options) => {
       if (Array.isArray(saved)) await update($, files, list => (list.length > 0 ? list : (saved as FileRow[]).map(row => ({ ...row, kind: kindOf(row.path) }))))
     })
     if (!isSplit) void $.ui.open({ id: PANE, title: 'Files' })
+    // The Gallery tab of 0.3.0 is gone (the grid is the bottom half now); a pane left open by an earlier load stays until closed.
+    void safely(() => $.ui.close({ id: 'session-files-gallery' }))
 
     return next(e)
   })
