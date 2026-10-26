@@ -47,7 +47,9 @@ test('a file Claude reads shows up in the list, and Use puts its @mention in the
   await $.tool.call({ tool: 'Read', file_path: '/work/src/notes.md' })
 
   const ui = await $.ui.mount(pane('session-files'))
-  expect(await ui.find({ type: 'Text', text: /notes\.md/ })).toBeDefined()
+  // The bottom half starts as a grid of tiles; the mode button switches it to the list.
+  expect(await ui.find({ type: 'Button', text: /notes\.md/ })).toBeDefined()
+  await ui.press({ plugin: 'session-files', key: 'files-mode' })
   await ui.press({ plugin: 'session-files', key: 'files-row-/work/src/notes.md' })
   await ui.press({ plugin: 'session-files', key: 'files-use' })
   expect(filled).toEqual([' @src/notes.md '])
@@ -93,6 +95,7 @@ test('View shows a text file in the panel and Back returns to the list', async (
   await $.tool.call({ tool: 'Edit', file_path: '/work/a.ts', old_string: 'a', new_string: 'b' })
 
   const ui = await $.ui.mount(pane('session-files'))
+  await ui.press({ plugin: 'session-files', key: 'files-mode' })
   await ui.press({ plugin: 'session-files', key: 'files-row-/work/a.ts' })
   await ui.press({ plugin: 'session-files', key: 'files-view' })
   expect((await ui.find({ type: 'Code' }))?.text).toContain('second line')
@@ -113,6 +116,7 @@ test('View shows the shrunk version; Expand takes the panel and Shrink brings th
   await $.tool.call({ tool: 'Read', file_path: '/work/a.ts' })
 
   const ui = await $.ui.mount(pane('todo-pane'))
+  await ui.press({ plugin: 'session-files', key: 'files-mode' })
   await ui.press({ plugin: 'session-files', key: 'files-row-/work/a.ts' })
   await ui.press({ plugin: 'session-files', key: 'files-view' })
   expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeDefined()
@@ -123,20 +127,32 @@ test('View shows the shrunk version; Expand takes the panel and Shrink brings th
   await ui.unmount()
 })
 
-test('the gallery draws a tile per file, and a tile opens the file big, with Back to the grid', async ($, on) => {
+test('the bottom half is a grid of tiles under every host tab, and a tile opens the file with Back to the grid', async ($, on) => {
   engine(on)
   on('fs.read', () => ({ value: 'one\ntwo' }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>{`top: ${e.requestId}`}</Text>
+  })
   await start($)
   await $.tool.call({ tool: 'Read', file_path: '/work/a.ts' })
   await $.tool.call({ tool: 'Read', file_path: '/work/shot.png' })
 
-  const ui = await $.ui.mount(pane('session-files-gallery'))
-  expect(await ui.find({ type: 'Text', text: /Gallery/ })).toBeDefined()
+  // Switching the top tab keeps the same bottom half.
+  for (const host of ['todo-pane', 'task-lists']) {
+    const tab = await $.ui.mount(pane(host))
+    expect(await tab.find({ type: 'Text', text: new RegExp(`top: ${host}`) })).toBeDefined()
+    expect(await tab.find({ type: 'Button', text: /a\.ts/ })).toBeDefined()
+    await tab.unmount()
+  }
+
+  const ui = await $.ui.mount(pane('todo-pane'))
   expect(await ui.find({ type: 'Text', text: /one/ })).toBeDefined()
-  await ui.press({ plugin: 'session-files', key: 'gallery-open-/work/a.ts' })
+  await ui.press({ plugin: 'session-files', key: 'grid-open-/work/a.ts' })
   expect((await ui.find({ type: 'Code' }))?.text).toContain('two')
-  expect(await ui.find({ type: 'Button', text: /Expand|Shrink/ })).toBeUndefined()
-  await ui.press({ plugin: 'session-files', key: 'gallery-back' })
-  expect(await ui.find({ type: 'Text', text: /Gallery/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /top: todo-pane/ })).toBeDefined()
+  await ui.press({ plugin: 'session-files', key: 'files-back' })
+  expect(await ui.find({ type: 'Button', text: /a\.ts/ })).toBeDefined()
   await ui.unmount()
 })

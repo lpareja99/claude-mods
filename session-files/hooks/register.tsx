@@ -6,11 +6,11 @@ import { absolute, addFile, fitBox, keepable, kindOf, mentionOf, mentionPaths, s
 import { fitCells, imageNumbers, pngSize } from './layout'
 
 const PANE = 'session-files'
-const GALLERY = 'session-files-gallery'
 // A gallery tile's picture box, in cells (the tile adds a border, a gap and a name row).
 const TILE_COLUMNS = 12
-const TILE_ROWS = 4
-const GALLERY_MAX_TILES = 24
+const TILE_ROWS = 3
+// Rows a tile takes: its border, the picture box and the name under it.
+const TILE_HEIGHT = TILE_ROWS + 3
 const MIN_ROWS = 3
 // A viewed text file is read again at most this often while the pane redraws.
 const TEXT_TTL_MS = 1500
@@ -21,7 +21,8 @@ const files = atom({ plugin: 'session-files', key: 'files' } as const, [] as Fil
 const selected = atom({ plugin: 'session-files', key: 'selected' } as const, null as string | null)
 const viewing = atom({ plugin: 'session-files', key: 'viewing' } as const, null as string | null)
 const viewOffset = atom({ plugin: 'session-files', key: 'viewOffset' } as const, 0)
-const gallery = atom({ plugin: 'session-files', key: 'gallery' } as const, null as string | null)
+const mode = atom({ plugin: 'session-files', key: 'mode' } as const, 'grid' as 'grid' | 'list')
+const gridPage = atom({ plugin: 'session-files', key: 'gridPage' } as const, 0)
 const expanded = atom({ plugin: 'session-files', key: 'expanded' } as const, false)
 const filter = atom({ plugin: 'session-files', key: 'filter' } as const, 'all' as FileFilter)
 
@@ -135,7 +136,9 @@ async function filesView($: EngineInterface, e: PaneInput, bodyRows: number) {
   const list = await read($, files)
   const row = open === null ? undefined : list.find(one => one.path === open)
 
-  return row ? viewer($, e, row, bodyRows) : browser($, e, list, bodyRows)
+  if (row) return viewer($, e, row, bodyRows)
+
+  return (await read($, mode)) === 'grid' ? grid($, e, list, bodyRows) : browser($, e, list, bodyRows)
 }
 
 async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows: number) {
@@ -156,6 +159,7 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
       <Box flexDirection="row" columnGap={1}>
         <Text bold>Files</Text>
         <Text dimColor>{list.length}</Text>
+        <Button key="files-mode" plain onPress={() => update($, mode, () => 'grid')}>grid</Button>
         {FILTERS.map(f => (
           <Button key={`files-filter-${f.value}`} plain onPress={() => update($, filter, () => f.value)}>
             <Text bold={by === f.value} dimColor={by !== f.value}>{f.label}</Text>
@@ -295,27 +299,26 @@ async function previewOf($: EngineInterface, path: string) {
   return hit ?? undefined
 }
 
-/** The gallery: every file as a thumbnail tile in a grid; a tile's name opens the file big. */
-async function galleryView($: EngineInterface, e: PaneInput, bodyRows: number) {
-  const open = await read($, gallery)
-  const list = await read($, files)
-  const row = open === null ? undefined : list.find(one => one.path === open)
-  if (row) {
-    return viewer($, e, row, bodyRows, {
-      prefix: 'gallery',
-      isBig: true,
-      close: () => update($, gallery, () => null),
-    })
-  }
-
+/** The grid: every file as a thumbnail tile, a page at a time; a tile's name opens the file. */
+async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows: number) {
   const { Box, Text, Button } = $.ui.resolve(e)
   const by = await read($, filter)
   const shown = visibleFiles(list, by)
-  const tiles = shown.slice(0, GALLERY_MAX_TILES)
   const perRow = Math.max(1, Math.floor((e.props.bodyColumns + 1) / (TILE_COLUMNS + 3)))
-  const grid: FileRow[][] = []
-  for (let i = 0; i < tiles.length; i += perRow) grid.push(tiles.slice(i, i + perRow))
+  // The header takes a row and the pager one; the tiles get the rest, at least one row of them.
+  const rowsPerPage = Math.max(1, Math.floor((bodyRows - 2) / TILE_HEIGHT))
+  const perPage = perRow * rowsPerPage
+  const pages = Math.max(1, Math.ceil(shown.length / perPage))
+  const page = clamp(await read($, gridPage), 0, pages - 1)
+  const tiles = shown.slice(page * perPage, (page + 1) * perPage)
+  const rows: FileRow[][] = []
+  for (let i = 0; i < tiles.length; i += perRow) rows.push(tiles.slice(i, i + perRow))
   const label = (name: string) => (name.length > TILE_COLUMNS ? `${name.slice(0, TILE_COLUMNS - 1)}…` : name)
+  const open = async (path: string) => {
+    await update($, viewOffset, () => 0)
+    await update($, expanded, () => false)
+    await update($, viewing, () => path)
+  }
 
   const picture = async (one: FileRow) => {
     const kind = kindOf(one.path)
@@ -325,7 +328,7 @@ async function galleryView($: EngineInterface, e: PaneInput, bodyRows: number) {
       if (preview) {
         const fit = fitBox(preview.size, TILE_COLUMNS, TILE_ROWS)
 
-        return <Image key={`gallery-image-${one.path}`} source={{ file: preview.png, format: 'png' }} columns={fit.columns} rows={fit.rows} alt={one.name} />
+        return <Image key={`grid-image-${one.path}`} source={{ file: preview.png, format: 'png' }} columns={fit.columns} rows={fit.rows} alt={one.name} />
       }
     }
     if (kind === 'text') {
@@ -334,7 +337,7 @@ async function galleryView($: EngineInterface, e: PaneInput, bodyRows: number) {
       return (
         <Box flexDirection="column" width={TILE_COLUMNS}>
           {lines.map((line, i) => (
-            <Text key={`gallery-line-${one.path}-${i}`} dimColor wrap="truncate">{line.trim()}</Text>
+            <Text key={`grid-line-${one.path}-${i}`} dimColor wrap="truncate">{line.trim()}</Text>
           ))}
         </Box>
       )
@@ -346,39 +349,52 @@ async function galleryView($: EngineInterface, e: PaneInput, bodyRows: number) {
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" columnGap={1}>
-        <Text bold>Gallery</Text>
+        <Text bold>Files</Text>
         <Text dimColor>{shown.length}</Text>
+        <Button key="files-mode" plain onPress={() => update($, mode, () => 'list')}>list</Button>
         {FILTERS.map(f => (
-          <Button key={`gallery-filter-${f.value}`} plain onPress={() => update($, filter, () => f.value)}>
+          <Button key={`files-filter-${f.value}`} plain onPress={async () => {
+            await update($, gridPage, () => 0)
+            await update($, filter, () => f.value)
+          }}>
             <Text bold={by === f.value} dimColor={by !== f.value}>{f.label}</Text>
           </Button>
         ))}
       </Box>
       {shown.length === 0 && <Text dimColor>Nothing yet: paste an image, @mention a file, or let Claude read one.</Text>}
       {await Promise.all(
-        grid.map(async (cells, r) => (
-          <Box key={`gallery-row-${r}`} flexDirection="row" columnGap={1}>
+        rows.map(async (cells, r) => (
+          <Box key={`grid-row-${r}`} flexDirection="row" columnGap={1}>
             {await Promise.all(
               cells.map(async one => (
-                <Box key={`gallery-tile-${one.path}`} flexDirection="column" alignItems="center" borderStyle="round" borderDimColor width={TILE_COLUMNS + 2}>
+                <Box key={`grid-tile-${one.path}`} flexDirection="column" alignItems="center" borderStyle="round" borderDimColor width={TILE_COLUMNS + 2}>
                   <Box height={TILE_ROWS} width={TILE_COLUMNS} alignItems="center" justifyContent="center" overflow="hidden">
                     {await picture(one)}
                   </Box>
-                  <Button key={`gallery-open-${one.path}`} plain onPress={() => update($, gallery, () => one.path)}>{label(one.name)}</Button>
+                  <Button key={`grid-open-${one.path}`} plain onPress={() => open(one.path)}>{label(one.name)}</Button>
                 </Box>
               )),
             )}
           </Box>
         )),
       )}
-      {shown.length > tiles.length && <Text dimColor>+{shown.length - tiles.length} more</Text>}
+      {pages > 1 && (
+        <Box flexDirection="row" columnGap={2}>
+          <Button key="grid-prev" plain onPress={() => update($, gridPage, () => Math.max(0, page - 1))}>‹ prev</Button>
+          <Text dimColor>{page + 1}/{pages}</Text>
+          <Button key="grid-next" plain onPress={() => update($, gridPage, () => Math.min(pages - 1, page + 1))}>next ›</Button>
+        </Box>
+      )}
     </Box>
   )
 }
 
 export const register: Register = (on, options) => {
   const isSplit = String(options.layout ?? 'split') !== 'tab'
-  const host = String(options.hostPane ?? 'todo-pane')
+  const hosts = String(options.hostPanes ?? 'todo-pane,task-lists')
+    .split(',')
+    .map(id => id.trim())
+    .filter(id => id !== '')
   const share = clamp(Number(options.topShare ?? 50), 20, 80)
 
   on('session.start', async ($, e, next) => {
@@ -389,21 +405,21 @@ export const register: Register = (on, options) => {
       if (Array.isArray(saved)) await update($, files, list => (list.length > 0 ? list : (saved as FileRow[]).map(row => ({ ...row, kind: kindOf(row.path) }))))
     })
     if (!isSplit) void $.ui.open({ id: PANE, title: 'Files' })
-    void $.ui.open({ id: GALLERY, title: 'Gallery' })
 
     return next(e)
   })
 
   on('command.run', { command: 'files' }, async $ => {
-    await $.ui.open(isSplit ? { id: host, focus: true } : { id: PANE, title: 'Files', focus: true })
+    await $.ui.open(isSplit ? { id: hosts[0] ?? 'todo-pane', focus: true } : { id: PANE, title: 'Files', focus: true })
 
     return { text: 'Files shown in the side panel.' }
   })
 
   on('command.run', { command: 'gallery' }, async $ => {
-    await $.ui.open({ id: GALLERY, title: 'Gallery', focus: true })
+    await update($, mode, () => 'grid')
+    await $.ui.open(isSplit ? { id: hosts[0] ?? 'todo-pane', focus: true } : { id: PANE, title: 'Files', focus: true })
 
-    return { text: 'Gallery opened.' }
+    return { text: 'Files shown as a grid in the side panel.' }
   })
 
   // Files Claude reads or changes.
@@ -434,36 +450,36 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  // The gallery tab: the same files as a grid of thumbnails.
-  on('ui.render', { component: 'Pane', requestId: GALLERY }, async ($, e) => galleryView($, e, e.props.scroll.bodyRows))
-
   // A pane of its own, for the tab layout (and as the fallback when the host pane is not drawn).
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => filesView($, e, e.props.scroll.bodyRows))
 
   // Split layout: the host pane keeps its drawing in the top part and the files take the rest.
+  // The files stay put while the top half changes tabs: every host pane gets the same bottom half.
   if (isSplit) {
-    on('ui.render', { component: 'Pane', requestId: host }, async ($, e, next) => {
-      const { Box, Text } = $.ui.resolve(e)
-      // One row goes to the divider between the parts.
-      const rows = Math.max(2 * MIN_ROWS + 1, e.props.scroll.bodyRows)
-      const topRows = clamp(Math.round(((rows - 1) * share) / 100), MIN_ROWS, rows - 1 - MIN_ROWS)
-      const bottomRows = rows - 1 - topRows
-      const rule = '─'.repeat(Math.max(4, e.props.bodyColumns))
-      // A viewer opened big takes the whole panel; the host pane's part waits behind it.
-      if ((await read($, viewing)) !== null && (await read($, expanded))) return filesView($, e, e.props.scroll.bodyRows)
-      const upper = await next({ ...e, props: { ...e.props, scroll: { ...e.props.scroll, bodyRows: topRows } } })
+    for (const host of hosts) {
+      on('ui.render', { component: 'Pane', requestId: host }, async ($, e, next) => {
+        const { Box, Text } = $.ui.resolve(e)
+        // One row goes to the divider between the parts.
+        const rows = Math.max(2 * MIN_ROWS + 1, e.props.scroll.bodyRows)
+        const topRows = clamp(Math.round(((rows - 1) * share) / 100), MIN_ROWS, rows - 1 - MIN_ROWS)
+        const bottomRows = rows - 1 - topRows
+        const rule = '─'.repeat(Math.max(4, e.props.bodyColumns))
+        // A viewer opened big takes the whole panel; the host pane's part waits behind it.
+        if ((await read($, viewing)) !== null && (await read($, expanded))) return filesView($, e, e.props.scroll.bodyRows)
+        const upper = await next({ ...e, props: { ...e.props, scroll: { ...e.props.scroll, bodyRows: topRows } } })
 
-      return (
-        <Box flexDirection="column">
-          <Box key="files-top" flexDirection="column" height={topRows} overflow="hidden">
-            {upper}
+        return (
+          <Box flexDirection="column">
+            <Box key="files-top" flexDirection="column" height={topRows} overflow="hidden">
+              {upper}
+            </Box>
+            <Text dimColor>{rule}</Text>
+            <Box key="files-bottom" flexDirection="column" height={bottomRows} overflow="hidden">
+              {await filesView($, e, bottomRows)}
+            </Box>
           </Box>
-          <Text dimColor>{rule}</Text>
-          <Box key="files-bottom" flexDirection="column" height={bottomRows} overflow="hidden">
-            {await filesView($, e, bottomRows)}
-          </Box>
-        </Box>
-      )
-    })
+        )
+      })
+    }
   }
 }

@@ -24,8 +24,10 @@ declare module 'claude-code' {
       viewing: string | null
       /** First line (text) shown while viewing. */
       viewOffset: number
-      /** The path opened big in the gallery tab, or null for the grid. */
-      gallery: string | null
+      /** The bottom half shows thumbnail tiles or the plain list. */
+      mode: 'grid' | 'list'
+      /** The grid's current page, from 0. */
+      gridPage: number
       /** The viewer takes the whole panel, the host pane's part included. */
       expanded: boolean
       filter: FileFilter

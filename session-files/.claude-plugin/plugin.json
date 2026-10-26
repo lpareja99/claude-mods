@@ -1,6 +1,6 @@
 {
   "name": "session-files",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Live list and thumbnail gallery of the files in your session: pasted images, @mentions, and files Claude read or edited. Reuse one in the next prompt, or open it in the side panel",
   "author": { "name": "Laura Pareja Prieto" },
   "license": "MIT",
@@ -14,11 +14,11 @@
       "default": "split",
       "options": ["split", "tab"]
     },
-    "hostPane": {
+    "hostPanes": {
       "type": "string",
-      "title": "Host pane",
-      "description": "Id of the pane the files go under in split layout",
-      "default": "todo-pane"
+      "title": "Host panes",
+      "description": "Comma-separated ids of the panes (tabs) the files go under in split layout; the files stay while you switch between them",
+      "default": "todo-pane,task-lists"
     },
     "topShare": {
       "type": "number",

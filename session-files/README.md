@@ -14,18 +14,18 @@ A Claude Code mod that keeps a live list of the files in your session, so you ca
 
 Rows other than pasted images are remembered per project folder between sessions. A pasted image's file lives in the session's temp folder, so it is only listed for that session.
 
-## Gallery
+## Grid and list
 
-A **Gallery** tab (next to Todos) shows every file as a thumbnail tile in a grid: pictures and a PDF's first page as pictures, text files as their first lines. Press a tile's name to open the file big in the tab; **Back** returns to the grid. The `all | mine | Claude's` filter works here too, and `/gallery` focuses the tab. A picture itself can't take a click in a terminal pane (only text buttons can), so the name under each tile is the button.
+The bottom half starts as a **grid** of thumbnail tiles: pictures and a PDF's first page as pictures, text files as their first lines, a page at a time with `‹ prev` / `next ›`. The `list` button next to the title switches to the plain list and `grid` switches back; `/gallery` shows the grid. A picture itself can't take a click in a terminal pane (only text buttons can), so the name under each tile is the button: pressing it opens the file at thumbnail size, with **Expand**, **Use**, **Open** and **Back** as above.
 
 ## Layout
 
-By default the files sit under the todo pane in the same side panel: the todo pane keeps its drawing in the top half (`next(e)` on its pane) and the files take the bottom half. `todo-pane` is not changed. `/files` focuses the panel.
+By default the files sit under the top tabs of the side panel: Todos and Task lists each keep their own drawing in the top half (`next(e)` on their pane) and the files take the bottom half. Switching between the tabs changes only the top; the bottom stays as it is. `todo-pane` and `task-lists` are not changed. `/files` focuses the panel.
 
 Set in the mod's options:
 
 - `layout`: `split` (default) or `tab` (a pane of its own).
-- `hostPane`: the pane the files go under, `todo-pane` by default.
+- `hostPanes`: comma-separated ids of the panes (tabs) the files go under, `todo-pane,task-lists` by default.
 - `topShare`: the share of the panel's height the host pane keeps, 50 by default.
 
 For the split to work this mod's hook must sit outside the host pane's in the hook chain; if the todo pane then shows alone, switch `layout` to `tab`.
