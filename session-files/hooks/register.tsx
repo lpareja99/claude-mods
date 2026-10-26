@@ -11,6 +11,8 @@ const TILE_COLUMNS = 12
 const TILE_ROWS = 3
 // Rows a tile takes: its border, the picture box and the name under it.
 const TILE_HEIGHT = TILE_ROWS + 3
+// Experimental (option tileClick: whole): invisible Buttons laid over the picture so a click anywhere on a tile opens it.
+let wholeTileClick = false
 const MIN_ROWS = 3
 // A viewed text file is read again at most this often while the pane redraws.
 const TEXT_TTL_MS = 1500
@@ -443,8 +445,18 @@ async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows:
                 <Box key={`grid-tile-${one.path}`} flexDirection="column" alignItems="center" borderStyle="round" borderDimColor width={TILE_COLUMNS + 2}>
                   <Box height={TILE_ROWS} width={TILE_COLUMNS} alignItems="center" justifyContent="center" overflow="hidden">
                     {await picture(one)}
+                    {wholeTileClick && (
+                      <Box position="absolute" top={0} left={0} width={TILE_COLUMNS} height={TILE_ROWS} flexDirection="column">
+                        {Array.from({ length: TILE_ROWS }, (_, row) => (
+                          <Button key={`grid-hit-${one.path}-${row}`} plain onPress={() => open(one.path)}>
+                            {' '.repeat(TILE_COLUMNS)}
+                          </Button>
+                        ))}
+                      </Box>
+                    )}
                   </Box>
-                  <Button key={`grid-open-${one.path}`} plain onPress={() => open(one.path)}>{label(one.name)}</Button>
+                  {/* The name is padded to the tile's width, so the whole bottom line takes the click. */}
+                  <Button key={`grid-open-${one.path}`} plain onPress={() => open(one.path)}>{label(one.name).padEnd(TILE_COLUMNS, ' ')}</Button>
                 </Box>
               )),
             )}
@@ -460,6 +472,7 @@ async function grid($: EngineInterface, e: PaneInput, list: FileRow[], bodyRows:
 
 export const register: Register = (on, options) => {
   const isSplit = String(options.layout ?? 'split') !== 'tab'
+  wholeTileClick = String(options.tileClick ?? 'name') === 'whole'
   const hosts = String(options.hostPanes ?? 'todo-pane,task-lists')
     .split(',')
     .map(id => id.trim())

@@ -200,3 +200,26 @@ test('typing in the search box narrows the list, and the clear button brings eve
   expect(await ui.find({ type: 'Button', text: /beta\.ts/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('with tileClick whole, a press anywhere on the picture opens the file', { options: { tileClick: 'whole' } }, async ($, on) => {
+  engine(on)
+  on('fs.read', () => ({ value: 'one\ntwo' }))
+  await start($)
+  await $.tool.call({ tool: 'Read', file_path: '/work/a.ts' })
+
+  const ui = await $.ui.mount(pane('session-files'))
+  await ui.press({ plugin: 'session-files', key: 'grid-hit-/work/a.ts-1' })
+  expect((await ui.find({ type: 'Code' }))?.text).toContain('two')
+  await ui.unmount()
+})
+
+test('by default there are no overlay buttons, only the name', async ($, on) => {
+  engine(on)
+  await start($)
+  await $.tool.call({ tool: 'Read', file_path: '/work/a.ts' })
+
+  const ui = await $.ui.mount(pane('session-files'))
+  expect(await ui.find({ type: 'Button', text: /a\.ts/ })).toBeDefined()
+  expect(await ui.find({ key: 'grid-hit-/work/a.ts-0' } as never)).toBeUndefined()
+  await ui.unmount()
+})

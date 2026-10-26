@@ -30,6 +30,7 @@ Set in the mod's options:
 
 - `layout`: `split` (default) or `tab` (a pane of its own).
 - `hostPanes`: comma-separated ids of the panes (tabs) the files go under, `todo-pane,task-lists` by default.
+- `tileClick` (experimental): `name` (default) or `whole`. In `name` mode a click on the name bar under a tile (padded to the tile's width) opens the file. In `whole` mode invisible one-row buttons are also laid over the picture, so a click anywhere on the tile opens it; they may blank the picture in some terminals, so switch back to `name` if the thumbnails disappear.
 - `topShare`: the share of the panel's height the host pane keeps, 50 by default.
 
 For the split to work this mod's hook must sit outside the host pane's in the hook chain; if the todo pane then shows alone, switch `layout` to `tab`.
