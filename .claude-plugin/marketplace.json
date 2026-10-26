@@ -1,19 +1,33 @@
 {
   "name": "local-mods",
-  "owner": { "name": "Laura Pareja Prieto" },
+  "owner": {
+    "name": "Laura Pareja Prieto"
+  },
   "description": "Claude Code mods by Laura Pareja Prieto",
   "plugins": [
     {
       "name": "todo-pane",
       "source": "./todo-pane",
       "description": "A side pane that shows Claude's todo list live, grouped by status, priority and blockers",
-      "author": { "name": "Laura Pareja Prieto" }
+      "author": {
+        "name": "Laura Pareja Prieto"
+      }
     },
     {
       "name": "task-lists",
       "source": "./task-lists",
       "description": "A pane that lists every saved task list, for this repo or all, and lets you choose which one the session uses",
-      "author": { "name": "Laura Pareja Prieto" }
+      "author": {
+        "name": "Laura Pareja Prieto"
+      }
+    },
+    {
+      "name": "image-view-transcript",
+      "source": "./image-view-transcript",
+      "description": "Thumbnails of pasted images above the prompt and on the sent message, and no duplicate pastes in one prompt",
+      "author": {
+        "name": "Laura Pareja Prieto"
+      }
     }
   ]
 }

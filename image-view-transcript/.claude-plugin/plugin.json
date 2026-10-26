@@ -1,0 +1,9 @@
+{
+  "name": "image-view-transcript",
+  "version": "0.1.0",
+  "description": "Thumbnails of pasted images above the prompt and on the sent message, and no duplicate pastes in one prompt",
+  "author": { "name": "Laura Pareja Prieto" },
+  "license": "MIT",
+  "keywords": ["images", "paste", "thumbnails", "terminal"],
+  "types": "./types/index.d.ts"
+}
