@@ -3,7 +3,7 @@ import type { EngineInterface, Register, RenderInput } from 'claude-code'
 
 import type { FileFilter, FileRow } from '../types'
 import { absolute, addFile, fitBox, keepable, kindOf, mentionOf, mentionPaths, sourcesLabel, touched, visibleFiles } from './files'
-import { imageNumbers, pngSize } from './layout'
+import { fitCells, imageNumbers, pngSize } from './layout'
 
 const PANE = 'session-files'
 const MIN_ROWS = 3
@@ -177,7 +177,7 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
               key="files-view"
               onPress={async () => {
                 await update($, viewOffset, () => 0)
-                await update($, expanded, () => true)
+                await update($, expanded, () => false)
                 await update($, viewing, () => chosen.path)
               }}
             >
@@ -226,8 +226,10 @@ async function viewer($: EngineInterface, e: PaneInput, row: FileRow, bodyRows: 
     if (png === undefined) return note(kind === 'pdf' ? 'No preview for this PDF here: use Open.' : 'No preview for this image format here.')
     const base64 = await $.fs.read(png, { as: 'bytes' }).then(b => b.base64, () => undefined)
     if (base64 === undefined) return note("Can't read this image (over 4 MiB or gone).")
-    // Fill the panel: as wide as it is, as tall as is left, whichever the picture's shape allows.
-    const fit = fitBox(pngSize(base64), Math.max(4, e.props.bodyColumns - 1), Math.max(3, room - (kind === 'pdf' ? 1 : 0)))
+    // Shrunk: the thumbnail's size. Expanded: fill the panel, as wide as it is and as tall as is left.
+    const maxRows = Math.max(3, room - (kind === 'pdf' ? 1 : 0))
+    const size = pngSize(base64)
+    const fit = isBig ? fitBox(size, Math.max(4, e.props.bodyColumns - 1), maxRows) : fitCells(size, maxRows)
     const columns = fit.columns
 
     return (

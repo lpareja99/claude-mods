@@ -101,7 +101,7 @@ test('View shows a text file in the panel and Back returns to the list', async (
   await ui.unmount()
 })
 
-test('View opens big; Shrink brings the host pane back and Expand takes the panel again', async ($, on) => {
+test('View shows the shrunk version; Expand takes the panel and Shrink brings the host pane back', async ($, on) => {
   engine(on)
   on('fs.read', () => ({ value: 'one\ntwo' }))
   on('ui.render', ($, e) => {
@@ -115,10 +115,10 @@ test('View opens big; Shrink brings the host pane back and Expand takes the pane
   const ui = await $.ui.mount(pane('todo-pane'))
   await ui.press({ plugin: 'session-files', key: 'files-row-/work/a.ts' })
   await ui.press({ plugin: 'session-files', key: 'files-view' })
-  expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeUndefined()
-  await ui.press({ plugin: 'session-files', key: 'files-expand' })
   expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeDefined()
   await ui.press({ plugin: 'session-files', key: 'files-expand' })
   expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeUndefined()
+  await ui.press({ plugin: 'session-files', key: 'files-expand' })
+  expect(await ui.find({ type: 'Text', text: /host pane/ })).toBeDefined()
   await ui.unmount()
 })
