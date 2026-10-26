@@ -207,13 +207,6 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
           <Text dimColor> {sourcesLabel(row)}</Text>
         </Button>
       ))}
-      {pages > 1 && (
-        <Box flexDirection="row" columnGap={2}>
-          <Button key="list-prev" plain onPress={() => update($, listPage, () => Math.max(0, page - 1))}>‹ prev</Button>
-          <Text dimColor>{page + 1}/{pages}</Text>
-          <Button key="list-next" plain onPress={() => update($, listPage, () => Math.min(pages - 1, page + 1))}>next ›</Button>
-        </Box>
-      )}
       {chosen && (
         <Box flexDirection="column">
           <Text dimColor wrap="truncate-start">{chosen.path}</Text>
@@ -232,6 +225,15 @@ async function browser($: EngineInterface, e: PaneInput, list: FileRow[], bodyRo
             <Button key="files-forget" onPress={() => forgetFile($, chosen)}>Forget</Button>
             {chosen.uses > 0 && <Text dimColor>used {chosen.uses}×</Text>}
           </Box>
+        </Box>
+      )}
+      {/* The pager stays at the bottom: an empty card's worth of rows holds its place while nothing is selected. */}
+      {!chosen && pages > 1 && <Box height={3} />}
+      {pages > 1 && (
+        <Box flexDirection="row" columnGap={2}>
+          <Button key="list-prev" plain onPress={() => update($, listPage, () => Math.max(0, page - 1))}>‹ prev</Button>
+          <Text dimColor>{page + 1}/{pages}</Text>
+          <Button key="list-next" plain onPress={() => update($, listPage, () => Math.min(pages - 1, page + 1))}>next ›</Button>
         </Box>
       )}
     </Box>
