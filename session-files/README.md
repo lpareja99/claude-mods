@@ -24,7 +24,7 @@ The bottom half starts as a **grid** of thumbnail tiles: pictures and a PDF's fi
 
 ## Layout
 
-By default the files sit under the top tabs of the side panel: Todos and Task lists each keep their own drawing in the top half (`next(e)` on their pane) and the files take the bottom half. Switching between the tabs changes only the top; the bottom stays as it is. `todo-pane` and `task-lists` are not changed. `/files` focuses the panel.
+By default the files sit under the top tabs of the side panel: Todos and Task lists each keep their own drawing in the top half (`next(e)` on their pane) and the files take the bottom half. Switching between the tabs changes only the top; the bottom stays as it is. `todo-pane` and `task-lists` are not changed. `/files` focuses the panel, and `/side-panel` opens every tab with the files below, or closes them all together if any is open.
 
 Set in the mod's options:
 

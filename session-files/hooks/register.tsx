@@ -6,6 +6,8 @@ import { absolute, addFile, ago, fitBox, formatSize, keepable, kindOf, matching,
 import { fitCells, imageNumbers, pngSize } from './layout'
 
 const PANE = 'session-files'
+// Tab titles of the panes this mod sits under, for opening them again.
+const TITLES: Record<string, string> = { 'todo-pane': 'Todos', 'task-lists': 'Task lists', 'session-files': 'Files' }
 // A gallery tile's picture box, in cells (the tile adds a border, a gap and a name row).
 const TILE_COLUMNS = 12
 const TILE_ROWS = 3
@@ -469,14 +471,13 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await safely(() => $.command.register({ name: 'files', description: "Show the session's files in the side panel" }))
+    await safely(() => $.command.register({ name: 'side-panel', description: 'Open or close the whole side panel: Todos, Task lists and the files below them' }))
     await safely(() => $.command.register({ name: 'gallery', description: "Show the session's files as a grid of thumbnails" }))
     void safely(async () => {
       const saved = await $.store.get(await storeKey($))
       if (Array.isArray(saved)) await update($, files, list => (list.length > 0 ? list : (saved as FileRow[]).map(row => ({ ...row, kind: kindOf(row.path) }))))
     })
     if (!isSplit) void $.ui.open({ id: PANE, title: 'Files' })
-    // The Gallery tab of 0.3.0 is gone (the grid is the bottom half now); a pane left open by an earlier load stays until closed.
-    void safely(() => $.ui.close({ id: 'session-files-gallery' }))
 
     return next(e)
   })
@@ -485,6 +486,22 @@ export const register: Register = (on, options) => {
     await $.ui.open(isSplit ? { id: hosts[0] ?? 'todo-pane', focus: true } : { id: PANE, title: 'Files', focus: true })
 
     return { text: 'Files shown in the side panel.' }
+  })
+
+  // One switch for the whole side panel: every tab and the files under them open together, or close together.
+  on('command.run', { command: 'side-panel' }, async $ => {
+    const tabs = isSplit ? hosts : [PANE]
+    const open = (await $.ui.panes()).filter(pane => tabs.includes(pane.id))
+    if (open.length > 0) {
+      for (const pane of open) await $.ui.close({ id: pane.id })
+
+      return { text: 'Side panel closed.' }
+    }
+    for (const [i, id] of tabs.entries()) {
+      await $.ui.open({ id, title: TITLES[id] ?? id, ...(i === 0 ? { focus: true as const } : {}) })
+    }
+
+    return { text: `Side panel opened: ${tabs.map(id => TITLES[id] ?? id).join(', ')}, with the files below.` }
   })
 
   on('command.run', { command: 'gallery' }, async $ => {

@@ -200,3 +200,37 @@ test('typing in the search box narrows the list, and the clear button brings eve
   expect(await ui.find({ type: 'Button', text: /beta\.ts/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('/side-panel opens every tab when none is open and closes them all when one is', async ($, on) => {
+  // Not engine(): this test records the ui.open calls itself.
+  on('command.register', () => ({ value: { command: 'files' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.cwd', () => ({ value: '/work' }))
+  on('store.get', () => ({ value: undefined }))
+  on('store.set', () => ({ value: undefined }))
+  const opened: string[] = []
+  const closed: string[] = []
+  let shown: { id: string; title: string; isShown: boolean; isFocused: boolean; isPlaced: boolean }[] = []
+  on('ui.open', (_, e) => {
+    opened.push(e.id)
+
+    return { value: { isPlaced: true } }
+  })
+  on('ui.panes', () => ({ value: shown }))
+  on('ui.close', (_, e) => {
+    closed.push(e.id)
+
+    return { value: undefined }
+  })
+  await start($)
+
+  const run = () =>
+    $.command.run({ command: 'side-panel', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 200 } })
+
+  expect((await run()).text).toContain('Side panel opened')
+  expect(opened).toEqual(expect.arrayContaining(['todo-pane', 'task-lists']))
+
+  shown = [{ id: 'task-lists', title: 'Task lists', isShown: true, isFocused: false, isPlaced: true }]
+  expect((await run()).text).toBe('Side panel closed.')
+  expect(closed).toEqual(['task-lists'])
+})
